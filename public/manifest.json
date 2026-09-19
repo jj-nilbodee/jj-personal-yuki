@@ -3,12 +3,12 @@
   "name": "Yuki Finance - Wealth & Tax Planner",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "favicon.svg",
       "type": "image/svg+xml",
       "sizes": "512x512"
     }
   ],
-  "start_url": "/",
+  "start_url": "./",
   "background_color": "#0a0e1a",
   "theme_color": "#0a0e1a",
   "display": "standalone",
