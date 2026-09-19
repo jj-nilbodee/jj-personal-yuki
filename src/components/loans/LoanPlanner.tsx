@@ -58,14 +58,14 @@ export const LoanPlanner: React.FC = () => {
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Top Debt Metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
-        <div className="card" style={{ background: 'linear-gradient(135deg, rgba(244,63,94,0.12) 0%, rgba(19,28,49,0.9) 100%)', border: '1px solid rgba(244,63,94,0.3)' }}>
+        <div className="card" style={{ background: 'linear-gradient(135deg, #ffe8ea 0%, #fffdf9 100%)', border: '1px solid #f2bec6' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--color-danger-light)' }}>TOTAL OUTSTANDING DEBT</span>
             <div style={{ padding: '0.4rem', borderRadius: 'var(--radius-md)', background: 'var(--color-danger-bg)' }}>
               <Landmark size={18} color="var(--color-danger-light)" />
             </div>
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-display)', color: 'white', marginTop: '0.5rem' }}>
+          <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-display)', color: 'var(--text-primary)', marginTop: '0.5rem' }}>
             {formatMoney(totalLoanDebt, currency)}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
@@ -86,7 +86,7 @@ export const LoanPlanner: React.FC = () => {
 
       {/* Extra Payment Early Payoff Simulator */}
       {activeLoan && comparison && (
-        <div className="card" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(6,182,212,0.06) 100%)', border: '1px solid rgba(16,185,129,0.3)' }}>
+        <div className="card" style={{ background: 'linear-gradient(135deg, #e5f4e9 0%, #e1f5f4 100%)', border: '1px solid #b9dcc7' }}>
           <div className="card-header">
             <div>
               <h3 className="card-title">
@@ -117,7 +117,7 @@ export const LoanPlanner: React.FC = () => {
           </div>
 
           {/* Interactive Extra Payment Slider & Presets */}
-          <div style={{ background: 'rgba(14,22,38,0.7)', padding: '1.25rem', borderRadius: 'var(--radius-lg)', marginBottom: '1.25rem' }}>
+          <div style={{ background: 'rgba(255,255,255,0.72)', padding: '1.25rem', borderRadius: 'var(--radius-lg)', marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Extra Monthly Contribution:</span>
               <span style={{ fontSize: '1.2rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-success-light)' }}>

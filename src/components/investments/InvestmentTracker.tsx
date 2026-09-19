@@ -14,11 +14,11 @@ import {
 } from 'lucide-react';
 
 const ASSET_COLORS: Record<AssetClass, string> = {
-  'Stock': '#6366f1',
-  'ETF/Fund': '#06b6d4',
-  'Crypto': '#f59e0b',
-  'Gold': '#eab308',
-  'Cash/Deposit': '#10b981',
+  'Stock': '#c47ba6',
+  'ETF/Fund': '#72b8bf',
+  'Crypto': '#d69a50',
+  'Gold': '#d5b75a',
+  'Cash/Deposit': '#5e9d83',
 };
 
 export const InvestmentTracker: React.FC = () => {
@@ -75,14 +75,14 @@ export const InvestmentTracker: React.FC = () => {
       {/* Portfolio Overview Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
         {/* Total Value */}
-        <div className="card" style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.12) 0%, rgba(19,28,49,0.9) 100%)', border: '1px solid rgba(6,182,212,0.3)' }}>
+        <div className="card" style={{ background: 'linear-gradient(135deg, #e1f5f4 0%, #fffdf9 100%)', border: '1px solid #b9e0de' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--color-invest-light)' }}>TOTAL PORTFOLIO VALUE</span>
             <div style={{ padding: '0.4rem', borderRadius: 'var(--radius-md)', background: 'var(--color-invest-bg)' }}>
               <TrendingUp size={18} color="var(--color-invest-light)" />
             </div>
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-display)', color: 'white', marginTop: '0.5rem' }}>
+          <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-display)', color: 'var(--text-primary)', marginTop: '0.5rem' }}>
             {formatMoney(totalPortfolioValue, currency)}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>

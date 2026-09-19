@@ -49,8 +49,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate
       <div
         className="card"
         style={{
-          background: 'radial-gradient(100% 100% at 50% 0%, rgba(99,102,241,0.2) 0%, rgba(14,22,38,0.95) 100%)',
-          border: '1px solid rgba(99,102,241,0.3)',
+          background: 'radial-gradient(100% 100% at 50% 0%, #f9dce9 0%, #fffdf9 72%)',
+          border: '1px solid #ecc5d9',
           padding: '1.75rem',
           position: 'relative',
           overflow: 'hidden',
@@ -73,7 +73,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate
                 fontWeight: 800,
                 fontFamily: 'var(--font-display)',
                 letterSpacing: '-0.02em',
-                color: netWorth >= 0 ? 'white' : 'var(--color-danger-light)',
+                color: netWorth >= 0 ? 'var(--text-primary)' : 'var(--color-danger-light)',
                 lineHeight: 1.1,
               }}
             >
@@ -88,7 +88,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate
           <button
             onClick={onOpenQuickAdd}
             className="btn btn-primary"
-            style={{ padding: '0.65rem 1.25rem', fontSize: '0.9rem', boxShadow: '0 4px 18px rgba(99,102,241,0.45)' }}
+            style={{ padding: '0.65rem 1.25rem', fontSize: '0.9rem', boxShadow: '0 4px 18px rgba(196,123,166,0.3)' }}
             id="hero-quick-log-btn"
           >
             <Sparkles size={16} />
@@ -158,7 +158,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ padding: '0.45rem', borderRadius: 'var(--radius-md)', background: 'rgba(99,102,241,0.15)' }}>
+                <div style={{ padding: '0.45rem', borderRadius: 'var(--radius-md)', background: '#fbe5ef' }}>
                   <Wallet size={18} color="var(--accent-primary-light)" />
                 </div>
                 <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Expenses & Budget</span>
@@ -203,7 +203,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '0.5rem' }}>
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Est. Annual Tax</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'white' }}>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
                   {formatMoney(taxResult.taxLiability, currency)}
                 </div>
               </div>

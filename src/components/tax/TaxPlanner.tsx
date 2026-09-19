@@ -41,12 +41,12 @@ export const TaxPlanner: React.FC = () => {
       {/* Top Tax Summary Metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
         {/* Estimated Tax Liability */}
-        <div className="card" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(19,28,49,0.9) 100%)', border: '1px solid rgba(168,85,247,0.3)' }}>
+        <div className="card" style={{ background: 'linear-gradient(135deg, #f1e7fa 0%, #fffdf9 100%)', border: '1px solid #dbc5ef' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--color-tax-light)' }}>ESTIMATED TAX LIABILITY</span>
             <span className="badge badge-purple">{taxResult.marginalRate}% Top Bracket</span>
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-display)', color: 'white', marginTop: '0.5rem' }}>
+          <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-display)', color: 'var(--text-primary)', marginTop: '0.5rem' }}>
             {formatMoney(taxResult.taxLiability, currency)}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
@@ -82,7 +82,7 @@ export const TaxPlanner: React.FC = () => {
 
       {/* Tax Optimization Recommendations */}
       {taxResult.suggestions.length > 0 && (
-        <div className="card" style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.1) 0%, rgba(99,102,241,0.08) 100%)', border: '1px solid rgba(6,182,212,0.3)' }}>
+        <div className="card" style={{ background: 'linear-gradient(135deg, #e1f5f4 0%, #f5edfb 100%)', border: '1px solid #b9e0de' }}>
           <div className="card-header" style={{ marginBottom: '0.75rem' }}>
             <h3 className="card-title">
               <Sparkles size={18} color="var(--color-invest-light)" />
@@ -96,7 +96,7 @@ export const TaxPlanner: React.FC = () => {
               <div
                 key={idx}
                 style={{
-                  background: 'rgba(14,22,38,0.7)',
+                  background: 'rgba(255,255,255,0.7)',
                   padding: '0.85rem',
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid var(--border-subtle)'

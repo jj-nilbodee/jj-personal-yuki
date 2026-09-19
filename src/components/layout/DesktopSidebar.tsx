@@ -6,7 +6,7 @@ import {
   TrendingUp,
   Landmark,
   ShieldCheck,
-  CircleDollarSign
+  Cat
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useAuth } from '../../context/AuthContext';
@@ -34,12 +34,12 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ activeTab, setAc
       {/* Brand Header */}
       <div className="sidebar-brand">
         <div className="sidebar-logo-icon">
-          <CircleDollarSign size={22} color="#ffffff" strokeWidth={2.5} />
+          <Cat size={22} color="#ffffff" strokeWidth={2.5} />
         </div>
         <div>
           <span className="sidebar-title">Yuki Finance</span>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-            Personal Wealth OS
+            Purrsonal Wealth Nook
           </div>
         </div>
       </div>

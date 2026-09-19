@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { CURRENCY_SYMBOLS } from '../../utils/currency';
-import { Settings, LogIn, LogOut, Sparkles, User as UserIcon } from 'lucide-react';
+import { Settings, LogIn, LogOut, Sparkles, User as UserIcon, Cat } from 'lucide-react';
 import { FirebaseConfigModal } from '../auth/FirebaseConfigModal';
 
 interface AppHeaderProps {
@@ -28,10 +28,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ activeTab, onOpenQuickAdd 
     <>
       <header className="app-header">
         <div className="header-left">
+          <Cat size={22} color="var(--accent-primary)" strokeWidth={2.2} aria-hidden="true" />
           <div>
             <h1 className="header-title">{getTabTitle()}</h1>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Unified Personal Finance Hub
+              A cozy nook for your money
             </p>
           </div>
         </div>
@@ -56,7 +57,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ activeTab, onOpenQuickAdd 
               title="Select Base Currency"
             >
               {Object.keys(CURRENCY_SYMBOLS).map((c) => (
-                <option key={c} value={c} style={{ background: '#0e1626' }}>
+                <option key={c} value={c} style={{ background: '#fffdf9' }}>
                   {c} ({CURRENCY_SYMBOLS[c]})
                 </option>
               ))}
