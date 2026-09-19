@@ -1,0 +1,16 @@
+{
+  "short_name": "Yuki Finance",
+  "name": "Yuki Finance - Wealth & Tax Planner",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0a0e1a",
+  "theme_color": "#0a0e1a",
+  "display": "standalone",
+  "orientation": "portrait"
+}

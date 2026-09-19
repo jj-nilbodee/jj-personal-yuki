@@ -1,0 +1,79 @@
+:root {
+  /* Color Palette - Deep Obsidian Luxury Dark Theme */
+  --bg-app: #080c16;
+  --bg-surface: #0e1626;
+  --bg-card: #131c31;
+  --bg-card-hover: #1a2540;
+  --bg-glass: rgba(19, 28, 49, 0.75);
+  --bg-glass-elevated: rgba(26, 37, 64, 0.85);
+
+  /* Primary Accent & Financial Pillars */
+  --accent-primary: #6366f1;
+  --accent-primary-light: #818cf8;
+  --accent-primary-glow: rgba(99, 102, 241, 0.25);
+
+  /* Growth / Income / Assets (Emerald) */
+  --color-success: #10b981;
+  --color-success-light: #34d399;
+  --color-success-bg: rgba(16, 185, 129, 0.12);
+  --color-success-glow: rgba(16, 185, 129, 0.25);
+
+  /* Expense / Debt / Liability (Rose) */
+  --color-danger: #f43f5e;
+  --color-danger-light: #fb7185;
+  --color-danger-bg: rgba(244, 63, 94, 0.12);
+  --color-danger-glow: rgba(244, 63, 94, 0.25);
+
+  /* Investments / Portfolios (Electric Cyan) */
+  --color-invest: #06b6d4;
+  --color-invest-light: #38bdf8;
+  --color-invest-bg: rgba(6, 182, 212, 0.12);
+
+  /* Tax / Planning (Royal Purple / Violet) */
+  --color-tax: #a855f7;
+  --color-tax-light: #c084fc;
+  --color-tax-bg: rgba(168, 85, 247, 0.12);
+
+  /* Warning / Budget Limits (Warm Amber) */
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.12);
+
+  /* Text Hierarchy */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-inverse: #0f172a;
+
+  /* Borders & Dividers */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.14);
+  --border-focus: #6366f1;
+
+  /* Shadows & Elevations */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px -1px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 30px -4px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 24px -2px var(--accent-primary-glow);
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Typography */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Outfit', var(--font-sans);
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* iOS Safe Area Insets & Dimensions */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+
+  /* Mobile dock height */
+  --bottom-nav-height: 64px;
+  --sidebar-width: 260px;
+}
