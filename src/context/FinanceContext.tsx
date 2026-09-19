@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect, ReactNode } from 'react';
 import {
   Transaction,
   CategoryBudget,
@@ -10,6 +10,7 @@ import { IncomeBreakdown } from '../services/taxEngine';
 import { StorageService } from '../services/storage';
 import { convertToCurrency } from '../utils/currency';
 import { useAuth } from './AuthContext';
+import { loadCloudFinanceData, saveCloudFinanceData } from '../services/firebase';
 
 interface FinanceContextType {
   transactions: Transaction[];
@@ -46,7 +47,7 @@ interface FinanceContextType {
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { currency } = useAuth();
+  const { currency, setCurrency, user, loading, isFirebaseConfigured } = useAuth();
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => StorageService.getTransactions());
   const [budgets, setBudgets] = useState<CategoryBudget[]>(() => StorageService.getBudgets());
@@ -54,6 +55,63 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [taxDeductions, setTaxDeductions] = useState<TaxDeductions>(() => StorageService.getTaxDeductions());
   const [investments, setInvestments] = useState<InvestmentHolding[]>(() => StorageService.getInvestments());
   const [loans, setLoans] = useState<Loan[]>(() => StorageService.getLoans());
+  const [cloudSyncReady, setCloudSyncReady] = useState(false);
+
+  // A real Firebase user gets one private document at users/{uid}. Existing browser
+  // data is uploaded once if that document does not exist, preserving current users.
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateFromCloud = async () => {
+      if (loading || !isFirebaseConfigured || !user || user.isDemo) {
+        setCloudSyncReady(false);
+        return;
+      }
+
+      setCloudSyncReady(false);
+      try {
+        const cloudData = await loadCloudFinanceData(user.uid);
+        if (cancelled) return;
+
+        if (cloudData) {
+          StorageService.saveAllData(cloudData);
+          setTransactions(cloudData.transactions);
+          setBudgets(cloudData.budgets);
+          setTaxIncome(cloudData.taxIncome);
+          setTaxDeductions(cloudData.taxDeductions);
+          setInvestments(cloudData.investments);
+          setLoans(cloudData.loans);
+          setCurrency(cloudData.currency);
+        } else {
+          await saveCloudFinanceData(user.uid, StorageService.getAllData());
+        }
+
+        if (!cancelled) setCloudSyncReady(true);
+      } catch {
+        // Keep the browser cache usable if the network or rules are unavailable.
+        if (!cancelled) setCloudSyncReady(false);
+      }
+    };
+
+    void hydrateFromCloud();
+    return () => { cancelled = true; };
+  }, [user?.uid, user?.isDemo, loading, isFirebaseConfigured, setCurrency]);
+
+  // Local storage remains an offline cache. Once a real user has hydrated, changes
+  // are mirrored to their Firestore document after each state update.
+  useEffect(() => {
+    if (!cloudSyncReady || !user || user.isDemo) return;
+
+    void saveCloudFinanceData(user.uid, {
+      transactions,
+      budgets,
+      taxIncome,
+      taxDeductions,
+      investments,
+      loans,
+      currency,
+    });
+  }, [cloudSyncReady, user?.uid, user?.isDemo, transactions, budgets, taxIncome, taxDeductions, investments, loans, currency]);
 
   // Calculations
   const totalPortfolioValue = useMemo(() => {

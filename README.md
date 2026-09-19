@@ -24,6 +24,23 @@ VITE_FIREBASE_APP_ID
 
 Firebase web configuration values are intended to be public identifiers; secure access using Firebase Authentication and Firestore Security Rules, rather than treating the API key as a secret.
 
+## Enable cloud data sync
+
+The app uses browser local storage in demo mode. Once a person signs in with a configured Firebase project, their finance data is stored in Cloud Firestore at `users/{uid}` and mirrored locally for offline use. The first signed-in session uploads the existing local data only when no cloud document exists; later sign-ins load that user's cloud data.
+
+1. Create a Firebase project and register a web app.
+2. In **Authentication → Sign-in method**, enable Google and add `jj-nilbodee.github.io` to **Authorized domains**.
+3. In **Firestore Database**, create a production database.
+4. Deploy the included [Firestore rules](firestore.rules), replacing `YOUR_PROJECT_ID`:
+
+   ```bash
+   npx firebase-tools deploy --only firestore:rules --project YOUR_PROJECT_ID
+   ```
+
+5. Enter the Firebase web configuration in the app's Settings screen or supply the `VITE_FIREBASE_*` environment variables at build time.
+
+Do not use Firestore's test mode in production. The included rules allow an authenticated user to access only their own `users/{uid}` document.
+
 ## Local development
 
 ```bash

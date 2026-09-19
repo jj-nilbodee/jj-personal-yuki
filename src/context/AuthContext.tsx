@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { UserProfile } from '../types/finance';
 import {
   signInWithGoogle,
@@ -44,10 +44,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  const setCurrency = (newCurrency: string) => {
+  const setCurrency = useCallback((newCurrency: string) => {
     setCurrencyState(newCurrency);
     StorageService.saveCurrency(newCurrency);
-  };
+  }, []);
 
   const login = async () => {
     setLoading(true);

@@ -7,6 +7,16 @@ import {
 } from '../types/finance';
 import { IncomeBreakdown } from './taxEngine';
 
+export interface FinanceData {
+  transactions: Transaction[];
+  budgets: CategoryBudget[];
+  taxIncome: IncomeBreakdown;
+  taxDeductions: TaxDeductions;
+  investments: InvestmentHolding[];
+  loans: Loan[];
+  currency: string;
+}
+
 const STORAGE_KEYS = {
   TRANSACTIONS: 'yuki_transactions',
   BUDGETS: 'yuki_budgets',
@@ -137,16 +147,30 @@ export const StorageService = {
   getCurrency: () => load<string>(STORAGE_KEYS.CURRENCY, 'THB'),
   saveCurrency: (currency: string) => save(STORAGE_KEYS.CURRENCY, currency),
 
+  getAllData: (): FinanceData => ({
+    transactions: StorageService.getTransactions(),
+    budgets: StorageService.getBudgets(),
+    taxIncome: StorageService.getTaxIncome(),
+    taxDeductions: StorageService.getTaxDeductions(),
+    investments: StorageService.getInvestments(),
+    loans: StorageService.getLoans(),
+    currency: StorageService.getCurrency(),
+  }),
+
+  saveAllData: (data: FinanceData): void => {
+    StorageService.saveTransactions(data.transactions);
+    StorageService.saveBudgets(data.budgets);
+    StorageService.saveTaxIncome(data.taxIncome);
+    StorageService.saveTaxDeductions(data.taxDeductions);
+    StorageService.saveInvestments(data.investments);
+    StorageService.saveLoans(data.loans);
+    StorageService.saveCurrency(data.currency);
+  },
+
   // Backup & Restore
   exportAllData: () => {
     return JSON.stringify({
-      transactions: StorageService.getTransactions(),
-      budgets: StorageService.getBudgets(),
-      taxIncome: StorageService.getTaxIncome(),
-      taxDeductions: StorageService.getTaxDeductions(),
-      investments: StorageService.getInvestments(),
-      loans: StorageService.getLoans(),
-      currency: StorageService.getCurrency(),
+      ...StorageService.getAllData(),
       exportDate: new Date().toISOString(),
     }, null, 2);
   },

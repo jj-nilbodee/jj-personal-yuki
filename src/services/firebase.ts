@@ -8,7 +8,9 @@ import {
   User as FirebaseUser,
   Auth
 } from 'firebase/auth';
+import { getFirestore, Firestore, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { UserProfile } from '../types/finance';
+import type { FinanceData } from './storage';
 
 export interface FirebaseConfig {
   apiKey: string;
@@ -50,6 +52,7 @@ export function getFirebaseConfig(): FirebaseConfig | null {
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
+let firestore: Firestore | null = null;
 
 export function initFirebase(): Auth | null {
   const config = getFirebaseConfig();
@@ -71,8 +74,56 @@ export function initFirebase(): Auth | null {
   }
 }
 
+export function initFirestore(): Firestore | null {
+  const config = getFirebaseConfig();
+  if (!config?.apiKey || !config.projectId) {
+    throw new Error('Firebase API key and project ID are required for Cloud Firestore.');
+  }
+
+  try {
+    const firebaseApp = app || (getApps().length ? getApps()[0] : initializeApp(config));
+    app = firebaseApp;
+    firestore = getFirestore(firebaseApp);
+    return firestore;
+  } catch (err) {
+    console.warn('Failed to initialize Cloud Firestore:', err);
+    return null;
+  }
+}
+
 // Initial attempt
 initFirebase();
+
+/** Read the signed-in user's finance document from Cloud Firestore. */
+export async function loadCloudFinanceData(uid: string): Promise<FinanceData | null> {
+  const db = firestore || initFirestore();
+  if (!db) return null;
+
+  try {
+    const snapshot = await getDoc(doc(db, 'users', uid));
+    if (!snapshot.exists()) return null;
+    return (snapshot.data().finance as FinanceData | undefined) || null;
+  } catch (err) {
+    console.warn('Failed to load finance data from Cloud Firestore:', err);
+    throw err;
+  }
+}
+
+/** Save the signed-in user's finance document to Cloud Firestore. */
+export async function saveCloudFinanceData(uid: string, data: FinanceData): Promise<void> {
+  const db = firestore || initFirestore();
+  if (!db) return;
+
+  try {
+    await setDoc(doc(db, 'users', uid), {
+      finance: data,
+      updatedAt: serverTimestamp(),
+      schemaVersion: 1,
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Failed to save finance data to Cloud Firestore:', err);
+  }
+}
 
 /**
  * Sign in with Google (using real Firebase if configured, or demo mode)
