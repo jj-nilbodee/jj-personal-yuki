@@ -1,66 +1,43 @@
-# Yuki Finance
+# Yuki
 
-A personal finance hub for expenses, investments, Thai tax planning, and loan repayment.
+A quiet, detail-oriented personal finance app for life in Thailand, named after a Scottish longhair cat. Phase 1 is the expense tracker: manual entry, Thai bank-slip reading (QR first, Gemini Flash as fallback), categories, accounts, recurring transactions and a monthly dashboard. It installs to the phone home screen as a PWA.
 
-## Host on GitHub Pages
+Product requirements live in [`docs/prd/`](docs/prd/).
 
-This repository includes a GitHub Actions workflow that builds and publishes the app whenever changes are pushed to `main`.
+**Stack:** Next.js (App Router) on Vercel · Supabase (Postgres + RLS, Auth, Storage) · Gemini Flash · Tailwind CSS.
 
-1. In the repository on GitHub, open **Settings → Pages**.
-2. Under **Build and deployment**, choose **GitHub Actions** as the source.
-3. Push the included workflow to `main`.
-4. When the **Deploy to GitHub Pages** workflow completes, the app will be available at `https://jj-nilbodee.github.io/jj-personal-yuki/`.
+## Setup
 
-The app works in demo mode without any credentials. For production Google sign-in, create a Firebase web app, enable Google as a Firebase Authentication provider, and add `jj-nilbodee.github.io` to Firebase Authentication's authorized domains. You can provide the public Firebase web configuration either in the in-app settings or through deployment environment variables:
+### 1. Supabase
 
-```text
-VITE_FIREBASE_API_KEY
-VITE_FIREBASE_AUTH_DOMAIN
-VITE_FIREBASE_PROJECT_ID
-VITE_FIREBASE_STORAGE_BUCKET
-VITE_FIREBASE_MESSAGING_SENDER_ID
-VITE_FIREBASE_APP_ID
-```
+1. Create a project at [supabase.com](https://supabase.com) (free tier).
+2. Apply the schema: open **SQL Editor**, paste `supabase/migrations/*.sql` in filename order and run. (With the Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push`.)
+3. **Authentication → Sign In / Providers → Google:** enable it and paste a Google OAuth client ID and secret. Create the client in Google Cloud Console (**APIs & Services → Credentials → OAuth client ID → Web application**) with the authorized redirect URI `https://<project-ref>.supabase.co/auth/v1/callback`.
+4. **Authentication → URL Configuration:** set **Site URL** to your production URL and add `http://localhost:3000/auth/callback` and `https://<your-vercel-domain>/auth/callback` to **Redirect URLs**.
 
-Firebase web configuration values are intended to be public identifiers; secure access using Firebase Authentication and Firestore Security Rules, rather than treating the API key as a secret.
+### 2. Gemini
 
-### Configure Firebase for GitHub Pages
+Create a free API key in [Google AI Studio](https://aistudio.google.com/apikey). Without one, slips still upload and the QR reference is still read, but amounts must be entered manually.
 
-The Pages workflow reads the following GitHub Actions secrets while building. In GitHub, open **Settings → Secrets and variables → Actions**, choose **New repository secret**, and add each value from your Firebase web app configuration:
-
-```text
-VITE_FIREBASE_API_KEY
-VITE_FIREBASE_AUTH_DOMAIN
-VITE_FIREBASE_PROJECT_ID
-VITE_FIREBASE_STORAGE_BUCKET
-VITE_FIREBASE_MESSAGING_SENDER_ID
-VITE_FIREBASE_APP_ID
-```
-
-After the secrets are saved, trigger **Deploy to GitHub Pages** from the Actions tab or push a commit to `main`. Vite embeds `VITE_*` values into the client bundle, so these identifiers will be visible in the deployed site; repository secrets prevent accidental source-control commits, but do not make Firebase web configuration secret.
-
-## Enable cloud data sync
-
-The app uses browser local storage in demo mode. Once a person signs in with a configured Firebase project, their finance data is stored in Cloud Firestore at `users/{uid}` and mirrored locally for offline use. The first signed-in session uploads the existing local data only when no cloud document exists; later sign-ins load that user's cloud data.
-
-1. Create a Firebase project and register a web app.
-2. In **Authentication → Sign-in method**, enable Google and add `jj-nilbodee.github.io` to **Authorized domains**.
-3. In **Firestore Database**, create a production database.
-4. Deploy the included [Firestore rules](firestore.rules), replacing `YOUR_PROJECT_ID`:
-
-   ```bash
-   npx firebase-tools deploy --only firestore:rules --project YOUR_PROJECT_ID
-   ```
-
-5. Add the Firebase configuration as GitHub Actions secrets using the steps above, then rerun the Pages deployment. The Settings screen remains useful for a local or one-device override.
-
-Do not use Firestore's test mode in production. The included rules allow an authenticated user to access only their own `users/{uid}` document.
-
-## Local development
+### 3. Environment
 
 ```bash
+cp .env.example .env.local   # then fill in the values
 npm ci
-npm run dev
+npm run dev                  # http://localhost:3000
 ```
 
-Create a production build with `npm run build`.
+### 4. Deploy (Vercel)
+
+Import the GitHub repo in Vercel and add the same variables from `.env.example` under **Settings → Environment Variables**. Every push to `main` deploys. `vercel.json` schedules the recurring-transactions job daily at 00:00 Bangkok time; Vercel sends `CRON_SECRET` with it automatically.
+
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Dev server |
+| `npm run build` | Production build (includes type-check) |
+| `npm run lint` | ESLint |
+| `npm test` | Unit tests (Vitest) |
+| `npm run test:db` | Runs the migrations in in-memory Postgres and checks RLS and the SQL functions |
+| `npm run icons` | Re-exports app icons from `public/brand/yuki-loaf.png` |
