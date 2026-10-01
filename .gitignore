@@ -28,3 +28,10 @@ dist-ssr
 .env*.local
 
 node_modules/*
+
+# Next.js / Vercel
+.next
+next-env.d.ts
+*.tsbuildinfo
+.vercel
+supabase/.temp
