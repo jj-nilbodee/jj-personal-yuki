@@ -1,0 +1,149 @@
+@import 'tailwindcss';
+
+/* Design tokens: docs/prd/part-3-design.md, section 2. Never hardcode colours in components. */
+:root {
+  --bg: #f3ece3;
+  --surface: #fffdf9;
+  --border: #e6dcd0;
+  --ink: #5e524c;
+  --ink-soft: #978a80;
+  --accent: #c98a4b;
+  --accent-soft: #f1d9a8;
+  --pink: #f2a9a6;
+  --income: #6f8f5e;
+  --expense: #c4726a;
+  --tile: #f6e9da; /* logo tile; illustrations only */
+  --on-accent: #fffdf9;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #241f1b;
+    --surface: #2e2823;
+    --border: #3d352e;
+    --ink: #efe6dc;
+    --ink-soft: #b3a699;
+    --accent: #e0a866;
+    --accent-soft: #4a3823;
+    --pink: #e8938f;
+    --income: #9dc089;
+    --expense: #e3978f;
+    --on-accent: #241f1b;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #241f1b;
+  --surface: #2e2823;
+  --border: #3d352e;
+  --ink: #efe6dc;
+  --ink-soft: #b3a699;
+  --accent: #e0a866;
+  --accent-soft: #4a3823;
+  --pink: #e8938f;
+  --income: #9dc089;
+  --expense: #e3978f;
+  --on-accent: #241f1b;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-pink: var(--pink);
+  --color-income: var(--income);
+  --color-expense: var(--expense);
+  --color-tile: var(--tile);
+  --color-on-accent: var(--on-accent);
+  --font-display: var(--font-nunito), ui-rounded, system-ui, sans-serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1, h2, h3, label, button, legend {
+    font-family: var(--font-display);
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  input, select, textarea {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+@utility num {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+@utility card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+}
+
+@utility field {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.625rem 0.875rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  &:focus {
+    border-color: var(--accent);
+    outline: none;
+  }
+}
+
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 1.125rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-family: var(--font-display);
+  transition: opacity 150ms;
+  &:disabled {
+    opacity: 0.55;
+  }
+}
+
+@utility btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+@utility btn-quiet {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
