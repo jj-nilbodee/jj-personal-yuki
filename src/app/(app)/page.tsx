@@ -4,9 +4,10 @@ import { AddButton } from '@/components/add-sheet';
 import { CategoryIcon } from '@/components/category-icon';
 import { TransactionRow, UpcomingRow } from '@/components/transaction-row';
 import { YukiArt } from '@/components/yuki';
-import { daysUntil, formatMoney, formatMonth, todayISO } from '@/lib/format';
+import { groupAccounts, transferLabel } from '@/lib/accounts';
+import { daysUntil, formatBalance, formatMoney, formatMonth, todayISO } from '@/lib/format';
 import { requireUser } from '@/lib/supabase/server';
-import type { Category, MonthSummary, Transaction, UpcomingRecurring } from '@/lib/types';
+import type { AccountBalance, Category, MonthSummary, Transaction, UpcomingRecurring } from '@/lib/types';
 
 function shiftMonth(month: string, by: number) {
   const d = new Date(`${month}-01T00:00:00Z`);
@@ -28,7 +29,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const month = requested && /^\d{4}-\d{2}$/.test(requested) ? requested : current;
   const isCurrent = month === current;
 
-  const [summaryRes, recentRes, draftsRes, upcomingRes, nudgesRes, categoriesRes] = await Promise.all([
+  const [summaryRes, recentRes, draftsRes, upcomingRes, nudgesRes, categoriesRes, balancesRes] = await Promise.all([
     supabase.rpc('month_summary', { p_month: `${month}-01` }),
     supabase
       .from('transactions')
@@ -41,6 +42,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     isCurrent ? supabase.rpc('upcoming_recurring', { p_days: 14 }) : Promise.resolve({ data: [] }),
     supabase.rpc('protective_nudges'),
     supabase.from('categories').select('*'),
+    supabase.rpc('account_balances'),
   ]);
 
   const summary = summaryRes.data as MonthSummary | null;
@@ -49,6 +51,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const upcoming = (upcomingRes.data ?? []) as UpcomingRecurring[];
   const nudges = (nudgesRes.data ?? []) as { kind: string; count: number }[];
   const categories = new Map(((categoriesRes.data ?? []) as Category[]).map((c) => [c.id, c]));
+  const balances = (balancesRes.data ?? []) as AccountBalance[];
+  const accounts = new Map(balances.map((a) => [a.id, a]));
+  const accountGroups = groupAccounts(balances.filter((a) => !a.archived));
 
   const income = Number(summary?.income ?? 0);
   const expense = Number(summary?.expense ?? 0);
@@ -126,7 +131,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               <h2 className="mb-2 font-bold">To check</h2>
               <div className="card divide-y divide-border overflow-hidden">
                 {drafts.map((tx) => (
-                  <TransactionRow key={tx.id} tx={tx} category={categories.get(tx.category_id ?? '')} />
+                  <TransactionRow key={tx.id} tx={tx} category={categories.get(tx.category_id ?? '')} accounts={accounts} />
                 ))}
               </div>
             </section>
@@ -159,7 +164,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 {upcoming.slice(0, 5).map((u) => (
                   <UpcomingRow
                     key={`${u.rule_id}-${u.due_date}`}
-                    merchant={u.merchant}
+                    merchant={u.type === 'transfer' ? transferLabel(u.account_id, u.to_account_id, accounts) : u.merchant}
                     amount={u.amount}
                     type={u.type}
                     dueLabel={dueLabel(u.due_date)}
@@ -179,11 +184,39 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </div>
             <div className="card divide-y divide-border overflow-hidden">
               {recent.map((tx) => (
-                <TransactionRow key={tx.id} tx={tx} category={categories.get(tx.category_id ?? '')} showDate />
+                <TransactionRow key={tx.id} tx={tx} category={categories.get(tx.category_id ?? '')} accounts={accounts} showDate />
               ))}
             </div>
           </section>
         </>
+      )}
+
+      {accountGroups.length > 0 && (
+        <section>
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="font-bold">Accounts</h2>
+            <Link href="/settings/accounts" className="text-sm font-semibold text-accent">
+              Manage
+            </Link>
+          </div>
+          <div className="card divide-y divide-border overflow-hidden">
+            {accountGroups.map((g) => (
+              <div key={g.type} className="px-4 py-2">
+                <h3 className="pt-1 text-sm text-ink-soft">{g.label}</h3>
+                <ul>
+                  {g.accounts.map((a) => (
+                    <li key={a.id}>
+                      <Link href={`/transactions?account=${a.id}`} className="flex min-h-11 items-center gap-3">
+                        <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                        <span className="num font-semibold">{formatBalance(Number(a.balance), a.type)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );

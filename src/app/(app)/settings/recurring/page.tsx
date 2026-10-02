@@ -2,20 +2,23 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { BackHeader } from '@/components/back-header';
 import { YukiArt } from '@/components/yuki';
+import { transferLabel } from '@/lib/accounts';
 import { formatDay, formatSigned } from '@/lib/format';
 import { requireUser } from '@/lib/supabase/server';
-import type { Category, RecurringRule } from '@/lib/types';
+import type { Account, Category, RecurringRule } from '@/lib/types';
 import { RuleActions } from './rule-actions';
 
 const FREQUENCY = { weekly: 'Every week', monthly: 'Every month', yearly: 'Every year' } as const;
 
 export default async function RecurringPage() {
   const { supabase } = await requireUser();
-  const [{ data: rules }, { data: cats }] = await Promise.all([
+  const [{ data: rules }, { data: cats }, { data: accs }] = await Promise.all([
     supabase.from('recurring_rules').select('*').order('next_run_date'),
     supabase.from('categories').select('*'),
+    supabase.from('accounts').select('*'),
   ]);
   const categories = new Map(((cats ?? []) as Category[]).map((c) => [c.id, c]));
+  const accounts = new Map(((accs ?? []) as Account[]).map((a) => [a.id, a]));
   const list = (rules ?? []) as RecurringRule[];
 
   return (
@@ -38,7 +41,9 @@ export default async function RecurringPage() {
             {list.map((r) => (
               <li key={r.id} className={`flex items-center gap-3 px-4 py-3 ${r.active ? '' : 'text-ink-soft'}`}>
                 <Link href={`/settings/recurring/${r.id}`} className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{r.merchant ?? categories.get(r.category_id ?? '')?.name ?? 'Recurring'}</span>
+                  <span className="block truncate font-medium">{r.type === 'transfer'
+                      ? transferLabel(r.account_id, r.to_account_id, accounts)
+                      : (r.merchant ?? categories.get(r.category_id ?? '')?.name ?? 'Recurring')}</span>
                   <span className="block text-sm text-ink-soft">
                     {r.active ? `${FREQUENCY[r.frequency]} · next ${formatDay(r.next_run_date)}` : 'Paused'}
                   </span>

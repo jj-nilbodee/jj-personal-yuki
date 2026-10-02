@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from 'react';
 import { deleteRecurring, saveRecurring } from '@/app/actions';
+import { AccountOptions } from '@/components/account-options';
 import { todayISO } from '@/lib/format';
 import type { Account, Category, RecurringRule, TxnType } from '@/lib/types';
 
@@ -19,6 +20,7 @@ export function RuleForm({ rule, categories, accounts }: { rule?: RecurringRule;
           <select name="type" value={type} onChange={(e) => setType(e.target.value as TxnType)} className="field">
             <option value="expense">Expense</option>
             <option value="income">Income</option>
+            <option value="transfer">Transfer</option>
           </select>
         </label>
         <label className="grid gap-1.5">
@@ -26,10 +28,12 @@ export function RuleForm({ rule, categories, accounts }: { rule?: RecurringRule;
           <input name="amount" inputMode="decimal" required defaultValue={rule?.amount} className="field num" />
         </label>
       </div>
-      <label className="grid gap-1.5">
-        <span className="text-sm font-semibold">{type === 'income' ? 'From' : 'Paid to'}</span>
-        <input name="merchant" defaultValue={rule?.merchant ?? ''} className="field" placeholder="e.g. Rent, Netflix" />
-      </label>
+      {type !== 'transfer' && (
+        <label className="grid gap-1.5">
+          <span className="text-sm font-semibold">{type === 'income' ? 'From' : 'Paid to'}</span>
+          <input name="merchant" defaultValue={rule?.merchant ?? ''} className="field" placeholder="e.g. Rent, Netflix" />
+        </label>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <label className="grid gap-1.5">
           <span className="text-sm font-semibold">Repeats</span>
@@ -45,30 +49,34 @@ export function RuleForm({ rule, categories, accounts }: { rule?: RecurringRule;
         </label>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <label className="grid gap-1.5">
-          <span className="text-sm font-semibold">Category</span>
-          <select name="category_id" defaultValue={rule?.category_id ?? ''} className="field" key={type}>
-            <option value="">None</option>
-            {categories
-              .filter((c) => c.type === type && !c.archived)
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-          </select>
-        </label>
-        <label className="grid gap-1.5">
-          <span className="text-sm font-semibold">Account</span>
-          <select name="account_id" defaultValue={rule?.account_id ?? ''} className="field">
-            <option value="">None</option>
-            {accounts
-              .filter((a) => !a.archived)
-              .map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
+        {type === 'transfer' ? (
+          <label className="grid gap-1.5">
+            <span className="text-sm font-semibold">To account</span>
+            <select name="to_account_id" defaultValue={rule?.to_account_id ?? ''} className="field" required>
+              <option value="">Choose</option>
+              <AccountOptions accounts={accounts} selected={rule?.to_account_id} />
+            </select>
+          </label>
+        ) : (
+          <label className="grid gap-1.5">
+            <span className="text-sm font-semibold">Category</span>
+            <select name="category_id" defaultValue={rule?.category_id ?? ''} className="field" key={type}>
+              <option value="">None</option>
+              {categories
+                .filter((c) => c.type === type && !c.archived)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
+        <label className="grid gap-1.5 -order-1">
+          <span className="text-sm font-semibold">{type === 'transfer' ? 'From account' : 'Account'}</span>
+          <select name="account_id" defaultValue={rule?.account_id ?? ''} className="field" required={type === 'transfer'}>
+            <option value="">{type === 'transfer' ? 'Choose' : 'None'}</option>
+            <AccountOptions accounts={accounts} selected={rule?.account_id} />
           </select>
         </label>
       </div>

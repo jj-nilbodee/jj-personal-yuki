@@ -2,35 +2,44 @@
 
 import Link from 'next/link';
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Maximize2, RotateCcw, Trash2, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Maximize2, RotateCcw, Trash2, X } from 'lucide-react';
 import { deleteTransaction, saveTransaction } from '@/app/actions';
 import { formatDay, formatMoney, todayISO } from '@/lib/format';
 import { THAI_BANKS } from '@/lib/slip/qr';
 import type { Account, Category, Extraction, Transaction, TxnType } from '@/lib/types';
+import { AccountOptions } from './account-options';
 import { CategoryIcon } from './category-icon';
 import { PawProgress } from './yuki';
 
 type Fields = {
-  type: TxnType;
+  type: TxnType | ''; // '' on a slip draft until the user says which way the money went
   amount: string;
   date: string;
   merchant: string;
   category_id: string;
   account_id: string;
+  to_account_id: string;
   note: string;
 };
 
 function fieldsFrom(tx?: Partial<Transaction>): Fields {
   return {
-    type: tx?.type ?? 'expense',
+    type: tx ? (tx.type ?? '') : 'expense',
     amount: tx?.amount != null ? String(tx.amount) : '',
     date: tx?.date ?? todayISO(),
     merchant: tx?.merchant ?? '',
     category_id: tx?.category_id ?? '',
     account_id: tx?.account_id ?? '',
+    to_account_id: tx?.to_account_id ?? '',
     note: tx?.note ?? '',
   };
 }
+
+const TYPES = [
+  { type: 'expense', label: 'Expense', Icon: ArrowUpRight, color: 'text-expense' },
+  { type: 'income', label: 'Income', Icon: ArrowDownLeft, color: 'text-income' },
+  { type: 'transfer', label: 'Transfer', Icon: ArrowLeftRight, color: 'text-ink' },
+] as const;
 
 export function TransactionEditor({
   tx,
@@ -91,8 +100,15 @@ export function TransactionEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function chooseType(type: TxnType) {
+    if (type === fields.type) return;
+    set('type', type);
+    set('category_id', '');
+    if (type !== 'transfer') set('to_account_id', '');
+  }
+
   const visibleCategories = categories.filter((c) => c.type === fields.type && (!c.archived || c.id === fields.category_id));
-  const visibleAccounts = accounts.filter((a) => !a.archived || a.id === fields.account_id);
+  const isTransfer = fields.type === 'transfer';
   const qr = extraction?.qr;
 
   return (
@@ -158,26 +174,31 @@ export function TransactionEditor({
         <input type="hidden" name="type" value={fields.type} />
         <input type="hidden" name="category_id" value={fields.category_id} />
 
-        <fieldset className="grid grid-cols-2 gap-2 rounded-full bg-surface p-1" aria-label="Type">
-          {(['expense', 'income'] as const).map((t) => {
-            const Arrow = t === 'income' ? ArrowDownLeft : ArrowUpRight;
-            return (
+        <div className="grid gap-2">
+          {fields.type === '' && (
+            <p id="type-question" className="font-semibold">
+              Money out, money in, or a move between your own accounts?
+            </p>
+          )}
+          <fieldset
+            className={`grid grid-cols-3 gap-1 rounded-full bg-surface p-1 ${fields.type === '' ? 'ring-2 ring-accent' : ''}`}
+            aria-label="Type"
+            aria-describedby={fields.type === '' ? 'type-question' : undefined}
+          >
+            {TYPES.map(({ type, label, Icon, color }) => (
               <button
-                key={t}
+                key={type}
                 type="button"
-                aria-pressed={fields.type === t}
-                onClick={() => {
-                  set('type', t);
-                  set('category_id', '');
-                }}
-                className={`btn ${fields.type === t ? 'btn-quiet' : 'text-ink-soft'}`}
+                aria-pressed={fields.type === type}
+                onClick={() => chooseType(type)}
+                className={`btn px-2 ${fields.type === type ? 'btn-quiet' : 'text-ink-soft'}`}
               >
-                <Arrow className={`size-4 ${t === 'income' ? 'text-income' : 'text-expense'}`} aria-hidden />
-                {t === 'income' ? 'Income' : 'Expense'}
+                <Icon className={`size-4 shrink-0 ${color}`} aria-hidden />
+                {label}
               </button>
-            );
-          })}
-        </fieldset>
+            ))}
+          </fieldset>
+        </div>
 
         <label className="grid gap-1.5">
           <span className="text-sm font-semibold">Amount</span>
@@ -198,54 +219,75 @@ export function TransactionEditor({
           </div>
         </label>
 
-        <div className="grid gap-1.5">
-          <span className="font-display text-sm font-semibold" id="category-label">
-            Category
-          </span>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-labelledby="category-label">
-            {visibleCategories.map((c) => {
-              const selected = fields.category_id === c.id;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => set('category_id', selected ? '' : c.id)}
-                  className={`flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold ${
-                    selected ? 'border-accent bg-accent-soft' : 'border-border bg-surface text-ink-soft'
-                  }`}
-                >
-                  <CategoryIcon name={c.icon} className="size-4" />
-                  {c.name}
-                </button>
-              );
-            })}
+        {(fields.type === 'expense' || fields.type === 'income') && (
+          <div className="grid gap-1.5">
+            <span className="font-display text-sm font-semibold" id="category-label">
+              Category
+            </span>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-labelledby="category-label">
+              {visibleCategories.map((c) => {
+                const selected = fields.category_id === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => set('category_id', selected ? '' : c.id)}
+                    className={`flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold ${
+                      selected ? 'border-accent bg-accent-soft' : 'border-border bg-surface text-ink-soft'
+                    }`}
+                  >
+                    <CategoryIcon name={c.icon} className="size-4" />
+                    {c.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
-          <label className="grid gap-1.5">
+          <label className={`grid gap-1.5 ${isTransfer ? 'col-span-2' : ''}`}>
             <span className="text-sm font-semibold">Date</span>
             <input type="date" name="date" required value={fields.date} onChange={(e) => set('date', e.target.value)} className="field" />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-sm font-semibold">Account</span>
-            <select name="account_id" value={fields.account_id} onChange={(e) => set('account_id', e.target.value)} className="field">
-              <option value="">None</option>
-              {visibleAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
+            <span className="text-sm font-semibold">{isTransfer ? 'From account' : 'Account'}</span>
+            <select
+              name="account_id"
+              value={fields.account_id}
+              onChange={(e) => set('account_id', e.target.value)}
+              className="field"
+              required={isTransfer}
+            >
+              <option value="">{isTransfer ? 'Choose' : 'None'}</option>
+              <AccountOptions accounts={accounts} selected={fields.account_id} />
             </select>
           </label>
+          {isTransfer && (
+            <label className="grid gap-1.5">
+              <span className="text-sm font-semibold">To account</span>
+              <select
+                name="to_account_id"
+                value={fields.to_account_id}
+                onChange={(e) => set('to_account_id', e.target.value)}
+                className="field"
+                required
+              >
+                <option value="">Choose</option>
+                <AccountOptions accounts={accounts} selected={fields.to_account_id} />
+              </select>
+            </label>
+          )}
         </div>
 
-        <label className="grid gap-1.5">
-          <span className="text-sm font-semibold">{fields.type === 'income' ? 'From' : 'Paid to'}</span>
-          <input name="merchant" value={fields.merchant} onChange={(e) => set('merchant', e.target.value)} className="field" autoComplete="off" />
-        </label>
+        {!isTransfer && (
+          <label className="grid gap-1.5">
+            <span className="text-sm font-semibold">{fields.type === 'income' ? 'From' : 'Paid to'}</span>
+            <input name="merchant" value={fields.merchant} onChange={(e) => set('merchant', e.target.value)} className="field" autoComplete="off" />
+          </label>
+        )}
 
         <label className="grid gap-1.5">
           <span className="text-sm font-semibold">Note</span>
@@ -258,7 +300,7 @@ export function TransactionEditor({
           </p>
         )}
 
-        <button className="btn btn-primary h-13 text-base" disabled={saving}>
+        <button className="btn btn-primary h-13 text-base" disabled={saving || fields.type === ''}>
           {status === 'confirmed' ? 'Save' : 'Looks right, save'}
         </button>
       </form>

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Plus, Search } from 'lucide-react';
+import { AccountOptions } from '@/components/account-options';
 import { AddButton } from '@/components/add-sheet';
 import { TransactionRow } from '@/components/transaction-row';
 import { YukiArt } from '@/components/yuki';
@@ -34,7 +35,10 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   }
   if (f.category === 'none') query = query.is('category_id', null).eq('status', 'confirmed');
   else if (f.category) query = query.eq('category_id', f.category);
-  if (f.account) query = query.eq('account_id', f.account);
+  // An account's history includes transfers into it. Only a UUID can reach the raw filter string.
+  if (f.account && /^[0-9a-f-]{36}$/i.test(f.account)) {
+    query = query.or(`account_id.eq.${f.account},to_account_id.eq.${f.account}`);
+  }
   if (f.from) query = query.gte('date', f.from);
   if (f.to) query = query.lte('date', f.to);
   if (f.status === 'review') query = query.neq('status', 'confirmed');
@@ -48,6 +52,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const categoryList = (catData ?? []) as Category[];
   const categories = new Map(categoryList.map((c) => [c.id, c]));
   const accounts = (accData ?? []) as Account[];
+  const accountMap = new Map(accounts.map((a) => [a.id, a]));
   const filtered = Object.values(f).some(Boolean);
 
   const byDay = new Map<string, Transaction[]>();
@@ -75,11 +80,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           </select>
           <select name="account" defaultValue={f.account ?? ''} className="field" aria-label="Account">
             <option value="">All accounts</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
+            <AccountOptions accounts={accounts} selected={f.account} />
           </select>
           <input name="from" type="date" defaultValue={f.from} className="field" aria-label="From date" />
           <input name="to" type="date" defaultValue={f.to} className="field" aria-label="To date" />
@@ -110,7 +111,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
       ) : (
         [...byDay].map(([day, rows]) => {
           const net = rows
-            .filter((t) => t.status === 'confirmed' && t.amount !== null)
+            .filter((t) => t.status === 'confirmed' && t.amount !== null && t.type !== 'transfer')
             .reduce((sum, t) => sum + (t.type === 'income' ? 1 : -1) * Number(t.amount), 0);
           return (
             <section key={day}>
@@ -123,7 +124,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
               </div>
               <div className="card divide-y divide-border overflow-hidden">
                 {rows.map((tx) => (
-                  <TransactionRow key={tx.id} tx={tx} category={categories.get(tx.category_id ?? '')} />
+                  <TransactionRow key={tx.id} tx={tx} category={categories.get(tx.category_id ?? '')} accounts={accountMap} />
                 ))}
               </div>
             </section>

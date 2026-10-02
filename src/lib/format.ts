@@ -6,8 +6,16 @@ export function formatMoney(amount: number | string | null | undefined): string 
   return `฿${money.format(Number(amount))}`;
 }
 
-export function formatSigned(amount: number | null, type: 'income' | 'expense'): string {
-  return `${type === 'income' ? '+' : '−'}${formatMoney(amount)}`;
+/** +฿ for income, −฿ for spending; transfers and undecided drafts carry no sign. */
+export function formatSigned(amount: number | null, type: 'income' | 'expense' | 'transfer' | null): string {
+  const sign = type === 'income' ? '+' : type === 'expense' ? '−' : '';
+  return `${sign}${formatMoney(amount)}`;
+}
+
+/** An account balance; on a credit card a negative balance is shown as the amount owed. */
+export function formatBalance(balance: number, accountType: string): string {
+  if (accountType === 'card') return balance < 0 ? `${formatMoney(-balance)} owed` : formatMoney(balance);
+  return `${balance < 0 ? '−' : ''}${formatMoney(Math.abs(balance))}`;
 }
 
 /** Today's date in Bangkok as YYYY-MM-DD, matching the database default. */

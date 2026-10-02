@@ -1,7 +1,9 @@
 // Row shapes for supabase/migrations. Keep in sync when the schema changes.
 
 export type AccountType = 'cash' | 'bank' | 'card' | 'e_wallet';
-export type TxnType = 'expense' | 'income';
+export type TxnType = 'expense' | 'income' | 'transfer';
+/** Categories describe spending or income; transfers never have one. */
+export type CategoryType = Exclude<TxnType, 'transfer'>;
 export type TxnSource = 'manual' | 'qr' | 'ocr' | 'recurring';
 export type TxnStatus = 'processing' | 'needs_review' | 'confirmed';
 export type Frequency = 'weekly' | 'monthly' | 'yearly';
@@ -12,12 +14,23 @@ export interface Account {
   type: AccountType;
   bank_code: string | null;
   archived: boolean;
+  opening_balance: number;
+}
+
+/** Row from account_balances(). Negative on a credit card means money owed. */
+export interface AccountBalance {
+  id: string;
+  name: string;
+  type: AccountType;
+  bank_code: string | null;
+  archived: boolean;
+  balance: number;
 }
 
 export interface Category {
   id: string;
   name: string;
-  type: TxnType;
+  type: CategoryType;
   icon: string;
   is_default: boolean;
   archived: boolean;
@@ -27,8 +40,9 @@ export interface Transaction {
   id: string;
   account_id: string | null;
   category_id: string | null;
+  to_account_id: string | null; // transfers only
   recurring_rule_id: string | null;
-  type: TxnType;
+  type: TxnType | null; // null on a slip draft until the user picks a direction
   amount: number | null;
   date: string; // YYYY-MM-DD, Bangkok local date
   merchant: string | null;
@@ -47,6 +61,7 @@ export interface RecurringRule {
   type: TxnType;
   amount: number;
   account_id: string | null;
+  to_account_id: string | null;
   category_id: string | null;
   merchant: string | null;
   note: string | null;
@@ -65,6 +80,7 @@ export interface UpcomingRecurring {
   note: string | null;
   category_id: string | null;
   account_id: string | null;
+  to_account_id: string | null;
 }
 
 export interface MonthSummary {
