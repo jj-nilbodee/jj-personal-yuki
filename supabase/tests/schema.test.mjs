@@ -73,3 +73,51 @@ await as(A, async () => {
   console.log('  upcoming', up.slice(0, 4).join(', '), '...', up.length);
   ok(up.length > 0, 'upcoming_recurring returns rows');
 });
+
+// Transfers, balances and type-less slip drafts.
+await as(A, async () => {
+  const cash = (await q(`select id from accounts where name='Cash'`)).rows[0].id;
+  const bank = (await q(`insert into accounts (name, type, bank_code) values ('KBank', 'bank', '004') returning id`)).rows[0].id;
+  const card = (await q(`insert into accounts (name, type) values ('Visa', 'card') returning id`)).rows[0].id;
+  await q(`select set_account_balance($1, 10000)`, [bank]);
+  await q(`select set_account_balance($1, -500)`, [card]);
+  await q(`insert into transactions (amount, account_id, date) values (200, $1, '2026-09-12')`, [card]);
+  await q(`insert into transactions (type, amount, account_id, date) values ('income', 3000, $1, '2026-09-13')`, [bank]);
+  await q(`insert into transactions (type, amount, account_id, to_account_id, date) values ('transfer', 700, $1, $2, '2026-09-14')`, [bank, card]);
+  await q(`insert into transactions (type, amount, account_id, to_account_id, date) values ('transfer', 300, $1, $2, '2026-09-14')`, [bank, cash]);
+  const bal = Object.fromEntries((await q(`select name, balance from account_balances()`)).rows.map((r) => [r.name, Number(r.balance)]));
+  console.log('  balances', JSON.stringify(bal));
+  ok(bal.KBank === 12000 && bal.Visa === 0 && bal.Cash === 300, 'account_balances: income, expense and transfers in/out');
+  await q(`select set_account_balance($1, 11500.25)`, [bank]);
+  ok(Number((await q(`select balance from account_balances() where id=$1`, [bank])).rows[0].balance) === 11500.25, 'set_account_balance sets the current balance');
+
+  const s = (await q(`select month_summary('2026-09-15') s`)).rows[0].s;
+  // 219.75 earlier + 200 card spend + 15,000 rent from the cron run above; transfers add nothing.
+  ok(Number(s.expense) === 15419.75 && Number(s.income) === 53000, 'month_summary ignores transfers');
+
+  const fails = async (sql, params) => { try { await q(sql, params); return false; } catch { return true; } };
+  ok(await fails(`insert into transactions (type, amount, account_id) values ('transfer', 5, $1)`, [bank]), 'confirmed transfer needs both accounts');
+  ok(await fails(`insert into transactions (type, amount, account_id, to_account_id) values ('transfer', 5, $1, $1)`, [bank]), 'transfer needs two different accounts');
+  ok(await fails(`insert into transactions (type, amount, account_id, to_account_id, category_id) values ('transfer', 5, $1, $2, $3)`, [bank, card, aFood]), 'transfer has no category');
+  ok(await fails(`insert into transactions (amount, to_account_id) values (5, $1)`, [bank]), 'only transfers have a destination account');
+  ok(await fails(`insert into categories (name, type) values ('Moves', 'transfer')`), 'no transfer categories');
+  ok(await fails(`insert into transactions (type, amount) values (null, 5)`), 'confirmed entry needs a type');
+  await q(`insert into transactions (type, amount, status, source) values (null, 42, 'needs_review', 'ocr')`);
+  ok(true, 'slip draft may wait without a type');
+
+  const uncategorized = async () => (await q(`select count::int n from protective_nudges() where kind = 'uncategorized'`)).rows[0]?.n ?? 0;
+  const before = await uncategorized();
+  for (let i = 0; i < 5; i++) await q(`insert into transactions (type, amount, account_id, to_account_id) values ('transfer', 1, $1, $2)`, [bank, cash]);
+  ok((await uncategorized()) === before, 'transfers are not counted as uncategorized');
+
+  await q(`insert into recurring_rules (type, amount, account_id, to_account_id, anchor_day, next_run_date) values ('transfer', 2000, $1, $2, 5, '2026-10-05')`, [bank, cash]);
+  ok(await fails(`insert into recurring_rules (type, amount, account_id, anchor_day, next_run_date) values ('transfer', 1, $1, 5, '2026-10-05')`, [bank]), 'recurring transfer needs both accounts');
+  const up = (await q(`select type::text, to_account_id from upcoming_recurring(10) where type = 'transfer'`)).rows;
+  ok(up.length === 1 && up[0].to_account_id === cash, 'upcoming_recurring includes transfers with destination');
+});
+const ran = (await q(`select run_due_recurring('2026-10-05') n`)).rows[0].n;
+const recurTransfer = (await q(`select to_account_id from transactions where source='recurring' and type='transfer'`)).rows;
+ok(ran >= 1 && recurTransfer.length === 1 && recurTransfer[0].to_account_id, 'cron creates recurring transfers');
+
+await q(`delete from auth.users where id=$1`, [A]);
+ok((await q(`select count(*)::int n from transactions where user_id=$1`, [A])).rows[0].n === 0, 'deleting a user removes their rows');
