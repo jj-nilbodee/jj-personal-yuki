@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { extractSlipFields } from '@/lib/slip/extract';
-import type { Category, Extraction, SlipFields, Transaction } from '@/lib/types';
+import type { Category, CategoryType, Extraction, SlipFields, Suggestion, Transaction } from '@/lib/types';
 
 const MIN_CONFIDENCE = 0.5;
 
@@ -31,9 +31,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   let ocr: SlipFields | null = null;
   try {
     if (!file) throw new Error('slip missing');
+    const names = (type: CategoryType) => (categories ?? []).filter((c) => c.type === type).map((c) => c.name);
     ocr = await extractSlipFields(
       { data: Buffer.from(await file.arrayBuffer()), mimeType: file.type || 'image/webp' },
-      (categories ?? []).filter((c) => c.type === 'expense').map((c) => c.name),
+      { expense: names('expense'), income: names('income') },
     );
     if (!ocr) extraction.error = 'unavailable';
     else if (ocr.amount === null || ocr.confidence < MIN_CONFIDENCE) extraction.error = 'unreadable';
@@ -44,21 +45,43 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   extraction.ocr = ocr;
 
   const update: Partial<Transaction> = { status: 'needs_review', extraction };
-  // The QR names the sending bank; if exactly one account is at that bank, it's this one.
-  if (bankAccounts?.length === 1) update.account_id = bankAccounts[0].id;
+
+  // The slip alone doesn't say whether the user sent or received the money, so
+  // prepare fields for each direction; the editor applies the one the user picks.
+  // The QR names the sending bank; if exactly one account is at that bank, the
+  // money left that account (an expense, or the "from" side of a transfer).
+  const sendingAccount = bankAccounts?.length === 1 ? bankAccounts[0].id : null;
+  const suggestCategory = async (type: CategoryType, party: string | null, modelPick: string | null) => {
+    // Prefer the category this payee/payer got last time; fall back to the model's pick.
+    const fromHistory = party ? (await supabase.rpc('suggest_category', { p_merchant: party, p_type: type })).data : null;
+    return fromHistory ?? categories?.find((c) => c.type === type && c.name === modelPick)?.id ?? null;
+  };
+  const suggested: NonNullable<Extraction['suggested']> = {
+    expense: {
+      merchant: ocr?.merchant ?? null,
+      category_id: ocr ? await suggestCategory('expense', ocr.merchant, ocr.expense_category) : null,
+      account_id: sendingAccount,
+    },
+    income: {
+      merchant: ocr?.sender_name ?? null,
+      category_id: ocr ? await suggestCategory('income', ocr.sender_name, ocr.income_category) : null,
+      account_id: null,
+    },
+    transfer: { account_id: sendingAccount },
+  };
+  extraction.suggested = suggested;
+
+  // Drafts from before slips asked for a direction already have a type; fill those in place.
+  const forType: Suggestion | undefined = tx.type ? suggested[tx.type] : undefined;
+  if (forType) {
+    update.merchant = tx.merchant ?? forType.merchant ?? null;
+    update.category_id = tx.category_id ?? forType.category_id ?? null;
+    update.account_id = tx.account_id ?? forType.account_id ?? null;
+  }
+
   if (ocr) {
     update.amount = tx.amount ?? ocr.amount;
-    update.merchant = tx.merchant ?? ocr.merchant;
     if (ocr.date) update.date = ocr.date;
-
-    // Prefer the category this merchant got last time; fall back to the model's pick.
-    if (!tx.category_id) {
-      const fromHistory = ocr.merchant
-        ? (await supabase.rpc('suggest_category', { p_merchant: ocr.merchant })).data
-        : null;
-      const byName = categories?.find((c) => c.type === 'expense' && c.name === ocr!.category)?.id;
-      update.category_id = fromHistory ?? byName ?? null;
-    }
 
     // Without a QR, the printed reference is the next best duplicate guard.
     const ref = ocr.reference_no?.replace(/\s+/g, '');

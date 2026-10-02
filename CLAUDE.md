@@ -27,10 +27,12 @@ npm run test:db      # applies supabase/migrations to in-memory Postgres (PGlite
 
 **Transaction lifecycle:** `status` is `processing → needs_review → confirmed`. Only `confirmed` rows count toward totals. Saving any form sets `confirmed`.
 
+**Types and accounts:** `type` is `expense`, `income` or `transfer`. A transfer moves money between two of the user's own accounts (`account_id → to_account_id`), has no category and never counts toward income or spending. Account balances come from `account_balances()` (opening balance + confirmed movements; negative on a card = owed) and are set via `set_account_balance()`.
+
 **Slip pipeline** (PRD Part 2 §3):
 1. Client (`src/lib/slip/prepare.ts`): downscale to ≤1600px WebP (JPEG on Safari) and decode the Slip Verify mini-QR with jsQR, offline.
 2. `POST /api/slips`: validates the QR (`src/lib/slip/qr.ts`, TLV + CRC16), rejects duplicates by `bank_ref` (409), inserts a `processing` row, uploads to the private `slips` bucket at `{user_id}/{year}/{tx_id}.webp`.
-3. `POST /api/slips/[id]/extract`: Gemini reads amount/date/merchant (`src/lib/slip/extract.ts`), category comes from merchant history (`suggest_category`) before the model's guess, and the row moves to `needs_review`. It never overwrites a row the user already confirmed, and the client editor never overwrites fields the user has touched. Retry calls the same endpoint.
+3. `POST /api/slips/[id]/extract`: Gemini reads amount/date/sender/recipient (`src/lib/slip/extract.ts`) and the row moves to `needs_review`. A slip row has no `type` until the user says whether it's an expense, income or transfer, so the route stores `extraction.suggested` per direction (payee or payer, category from `suggest_category` history before the model's guess, sending-bank account) and the editor applies the one the user picks. It never overwrites a row the user already confirmed, and the client editor never overwrites fields the user has touched. Retry calls the same endpoint.
 
 Mutations from forms are server actions in `src/app/actions.ts`; API routes exist where a future native client would need to call them too (slips, cron).
 

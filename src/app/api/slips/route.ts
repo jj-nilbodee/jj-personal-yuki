@@ -30,6 +30,7 @@ export async function POST(request: Request) {
     .from('transactions')
     .insert({
       status: 'processing',
+      type: null, // the user says which way the money went when they check it
       source: qr ? 'qr' : 'ocr',
       bank_ref: qr?.ref ?? null,
       sending_bank_code: qr?.bankCode ?? null,

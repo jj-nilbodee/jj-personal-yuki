@@ -97,6 +97,14 @@ export interface Extraction {
   ocr?: SlipFields | null;
   error?: 'unreadable' | 'unavailable' | null;
   duplicateOf?: { id: string; date: string; amount: number | null } | null;
+  /** Field suggestions per direction, applied once the user says which way the money went. */
+  suggested?: Partial<Record<TxnType, Suggestion>>;
+}
+
+export interface Suggestion {
+  merchant?: string | null;
+  category_id?: string | null;
+  account_id?: string | null;
 }
 
 /** Fields the vision model returns for a slip or receipt. */
@@ -104,11 +112,12 @@ export interface SlipFields {
   amount: number | null;
   date: string | null; // YYYY-MM-DD
   time: string | null; // HH:mm
-  merchant: string | null;
+  merchant: string | null; // who received the money: shop or transfer recipient
   sender_name: string | null;
   bank_name: string | null;
   reference_no: string | null;
   kind: 'transfer_slip' | 'receipt' | 'other';
-  category: string | null;
+  expense_category: string | null; // best fit if this was money out
+  income_category: string | null; // best fit if this was money in
   confidence: number;
 }

@@ -15,10 +15,14 @@ const schema = {
     sender_name: { type: ['string', 'null'] },
     bank_name: { type: ['string', 'null'] },
     reference_no: { type: ['string', 'null'], description: 'Bank transaction reference, exactly as printed' },
-    category: { type: ['string', 'null'], description: 'One of the provided category names, or null if none fit' },
+    expense_category: { type: ['string', 'null'], description: 'If the user paid this: one of the expense category names, or null' },
+    income_category: { type: ['string', 'null'], description: 'If the user received this: one of the income category names, or null' },
     confidence: { type: 'number', description: '0 to 1: how sure you are of amount, date and merchant together' },
   },
-  required: ['kind', 'amount', 'date', 'time', 'merchant', 'sender_name', 'bank_name', 'reference_no', 'category', 'confidence'],
+  required: [
+    'kind', 'amount', 'date', 'time', 'merchant', 'sender_name', 'bank_name', 'reference_no',
+    'expense_category', 'income_category', 'confidence',
+  ],
 };
 
 /**
@@ -27,7 +31,7 @@ const schema = {
  */
 export async function extractSlipFields(
   image: { data: Buffer; mimeType: string },
-  categoryNames: string[],
+  categoryNames: { expense: string[]; income: string[] },
 ): Promise<SlipFields | null> {
   if (!process.env.GEMINI_API_KEY) return null;
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -35,7 +39,9 @@ export async function extractSlipFields(
   const prompt = [
     'This image is a Thai bank transfer slip or a shop receipt. Extract the transaction.',
     'Text may be in Thai or English. Use only what is visible; return null for anything you cannot read.',
-    `For "category", choose the best fit from: ${categoryNames.join(', ')}.`,
+    'The slip may show the user paying someone or someone paying the user; read both sender and recipient.',
+    `For "expense_category", choose the best fit from: ${categoryNames.expense.join(', ')}.`,
+    `For "income_category", choose the best fit from: ${categoryNames.income.join(', ')}.`,
   ].join('\n');
 
   const response = await ai.models.generateContent({

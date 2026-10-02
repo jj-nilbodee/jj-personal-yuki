@@ -68,6 +68,17 @@ export function TransactionEditor({
     setFields((f) => ({ ...f, [key]: value }));
   };
 
+  /** Fill untouched fields with what the slip suggested for the chosen direction. */
+  function withSuggestion(f: Fields, ex: Extraction | null): Fields {
+    const suggestion = f.type ? ex?.suggested?.[f.type] : undefined;
+    if (!suggestion) return f;
+    const next = { ...f };
+    for (const k of ['merchant', 'category_id', 'account_id'] as const) {
+      if (!touched.current.has(k)) next[k] = suggestion[k] ?? '';
+    }
+    return next;
+  }
+
   async function extract() {
     if (!tx) return;
     setStatus('processing');
@@ -82,7 +93,8 @@ export function TransactionEditor({
         (Object.keys(next) as (keyof Fields)[]).forEach((k) => {
           if (!touched.current.has(k)) (merged[k] as string) = next[k];
         });
-        return merged;
+        // The user may have picked a direction while the slip was still being read.
+        return withSuggestion(merged, transaction.extraction);
       });
       setExtraction(transaction.extraction);
       setStatus(transaction.status);
@@ -102,9 +114,14 @@ export function TransactionEditor({
 
   function chooseType(type: TxnType) {
     if (type === fields.type) return;
-    set('type', type);
-    set('category_id', '');
-    if (type !== 'transfer') set('to_account_id', '');
+    touched.current.add('type');
+    // A category belongs to one type, so it never carries over to another.
+    touched.current.delete('category_id');
+    setFields((f) => {
+      const next = { ...f, type, category_id: '', to_account_id: type === 'transfer' ? f.to_account_id : '' };
+      // On a slip draft, swap in what the slip suggests for this direction (payee vs payer, account).
+      return status === 'confirmed' ? next : withSuggestion(next, extraction);
+    });
   }
 
   const visibleCategories = categories.filter((c) => c.type === fields.type && (!c.archived || c.id === fields.category_id));
