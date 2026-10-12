@@ -2,8 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { endOfMonth } from '@/lib/format';
+import { parseRepeat, scheduleFor } from '@/lib/recurring';
 import { requireUser } from '@/lib/supabase/server';
-import type { AccountType, CategoryType, Frequency, TxnType } from '@/lib/types';
+import type { AccountType, CategoryType, TxnType } from '@/lib/types';
 
 export type ActionResult = { error?: string } | undefined;
 
@@ -45,13 +47,17 @@ function refresh() {
 // Transactions
 // ---------------------------------------------------------------------------
 
-/** Create (no id) or update a transaction. Saving always confirms it. */
+/**
+ * Create (no id) or update a transaction. Saving always confirms it. With a
+ * `repeat` schedule the entry also becomes a recurring rule (make_recurring).
+ */
 export async function saveTransaction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { supabase } = await requireUser();
   const amount = parseAmount(str(form, 'amount'));
   if (!amount) return { error: 'Enter an amount above zero.' };
   const typed = typedFields(form);
   if ('error' in typed) return typed;
+  const repeat = parseRepeat(str(form, 'repeat'));
 
   const row = {
     ...typed.fields,
@@ -62,12 +68,24 @@ export async function saveTransaction(_prev: ActionResult, form: FormData): Prom
   };
 
   const id = str(form, 'id');
-  const { error } = id
-    ? await supabase.from('transactions').update(row).eq('id', id)
-    : await supabase.from('transactions').insert({ ...row, source: 'manual' });
+  const { data: saved, error } = id
+    ? await supabase.from('transactions').update(row).eq('id', id).select('id').single()
+    : await supabase.from('transactions').insert({ ...row, source: 'manual' }).select('id').single();
 
   if (error) {
     return { error: error.code === '23505' ? 'That bank reference is already on another entry.' : error.message };
+  }
+  if (repeat) {
+    const { frequency, anchorDay } = scheduleFor(repeat);
+    const { error: repeatError } = await supabase.rpc('make_recurring', {
+      p_transaction_id: saved.id,
+      p_frequency: frequency,
+      p_anchor_day: anchorDay,
+    });
+    if (repeatError) {
+      refresh();
+      return { error: `Saved, but it isn't repeating yet (${repeatError.message}). Set it up in Settings › Recurring.` };
+    }
   }
   refresh();
   const returnTo = str(form, 'return_to');
@@ -147,19 +165,22 @@ export async function setAccountArchived(id: string, archived: boolean): Promise
 export async function saveRecurring(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { supabase } = await requireUser();
   const amount = parseAmount(str(form, 'amount'));
-  const next = str(form, 'next_run_date');
+  const picked = str(form, 'next_run_date');
   if (!amount) return { error: 'Enter an amount above zero.' };
-  if (!next) return { error: 'Pick the next due date.' };
+  if (!picked) return { error: 'Pick the next due date.' };
   const typed = typedFields(form);
   if ('error' in typed) return typed;
+  const { frequency, anchorDay } = scheduleFor(parseRepeat(str(form, 'repeat')) ?? 'monthly');
+  // A month-end rule always falls on the last day, whichever day of the month was picked.
+  const next = anchorDay ? endOfMonth(picked) : picked;
 
   const row = {
     ...typed.fields,
     amount,
     note: str(form, 'note'),
-    frequency: (str(form, 'frequency') ?? 'monthly') as Frequency,
+    frequency,
     next_run_date: next,
-    anchor_day: Number(next.slice(8, 10)),
+    anchor_day: anchorDay ?? Number(next.slice(8, 10)),
   };
   const id = str(form, 'id');
   const { error } = id

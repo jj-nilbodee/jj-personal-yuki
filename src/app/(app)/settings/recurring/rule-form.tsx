@@ -4,6 +4,7 @@ import { useActionState, useState, useTransition } from 'react';
 import { deleteRecurring, saveRecurring } from '@/app/actions';
 import { AccountOptions } from '@/components/account-options';
 import { todayISO } from '@/lib/format';
+import { REPEAT_LABEL, REPEATS, repeatOf } from '@/lib/recurring';
 import type { Account, Category, RecurringRule, TxnType } from '@/lib/types';
 
 export function RuleForm({ rule, categories, accounts }: { rule?: RecurringRule; categories: Category[]; accounts: Account[] }) {
@@ -37,10 +38,12 @@ export function RuleForm({ rule, categories, accounts }: { rule?: RecurringRule;
       <div className="grid grid-cols-2 gap-3">
         <label className="grid gap-1.5">
           <span className="text-sm font-semibold">Repeats</span>
-          <select name="frequency" defaultValue={rule?.frequency ?? 'monthly'} className="field">
-            <option value="weekly">Every week</option>
-            <option value="monthly">Every month</option>
-            <option value="yearly">Every year</option>
+          <select name="repeat" defaultValue={rule ? repeatOf(rule) : 'monthly'} className="field">
+            {REPEATS.map((r) => (
+              <option key={r} value={r}>
+                {REPEAT_LABEL[r]}
+              </option>
+            ))}
           </select>
         </label>
         <label className="grid gap-1.5">

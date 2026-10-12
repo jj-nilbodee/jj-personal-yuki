@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Maximize2, RotateCcw, Trash2, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Maximize2, Repeat as RepeatIcon, RotateCcw, Trash2, X } from 'lucide-react';
 import { deleteTransaction, saveTransaction } from '@/app/actions';
 import { formatDay, formatMoney, todayISO } from '@/lib/format';
+import { REPEATS, repeatLabel } from '@/lib/recurring';
 import { THAI_BANKS } from '@/lib/slip/qr';
 import type { Account, Category, Extraction, Transaction, TxnType } from '@/lib/types';
 import { AccountOptions } from './account-options';
@@ -307,6 +308,32 @@ export function TransactionEditor({
             <span className="text-sm font-semibold">{fields.type === 'income' ? 'From' : 'Paid to'}</span>
             <input name="merchant" value={fields.merchant} onChange={(e) => set('merchant', e.target.value)} className="field" autoComplete="off" />
           </label>
+        )}
+
+        {tx?.recurring_rule_id ? (
+          <p className="flex items-center gap-2 text-sm text-ink-soft">
+            <RepeatIcon className="size-4 shrink-0" aria-hidden />
+            <span>
+              Repeats automatically.{' '}
+              <Link href={`/settings/recurring/${tx.recurring_rule_id}`} className="font-semibold text-accent">
+                Change the schedule
+              </Link>
+            </span>
+          </p>
+        ) : (
+          fields.type !== '' && (
+            <label className="grid gap-1.5">
+              <span className="text-sm font-semibold">Repeat</span>
+              <select name="repeat" defaultValue="" className="field">
+                <option value="">Doesn&apos;t repeat</option>
+                {REPEATS.map((r) => (
+                  <option key={r} value={r}>
+                    {repeatLabel(r, fields.date)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )
         )}
 
         <label className="grid gap-1.5">

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Plus, Search } from 'lucide-react';
+import { ArrowDownLeft, Plus, Search } from 'lucide-react';
 import { AccountOptions } from '@/components/account-options';
 import { AddButton } from '@/components/add-sheet';
 import { TransactionRow } from '@/components/transaction-row';
@@ -120,8 +120,12 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           <section className="card flex flex-col items-center gap-4 p-8 text-center">
             <YukiArt pose="asleep" size={120} />
             <p>Nothing logged yet. Yuki&apos;s napping until you add one.</p>
-            <AddButton>
-              <Plus className="size-5" aria-hidden /> Add your first expense
+            <p className="text-sm text-ink-soft">Start with your income so the balance shows what&apos;s left to spend.</p>
+            <Link href="/transactions/new?type=income" className="btn btn-primary">
+              <ArrowDownLeft className="size-5" aria-hidden /> Add your income
+            </Link>
+            <AddButton className="btn btn-quiet">
+              <Plus className="size-5" aria-hidden /> Add an expense
             </AddButton>
           </section>
         )

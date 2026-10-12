@@ -36,7 +36,7 @@ npm run test:db      # applies supabase/migrations to in-memory Postgres (PGlite
 
 Mutations from forms are server actions in `src/app/actions.ts`; API routes exist where a future native client would need to call them too (slips, cron).
 
-**Recurring:** Vercel Cron (`vercel.json`, 17:00 UTC = 00:00 Bangkok) calls `/api/cron/recurring`, which runs `run_due_recurring()` to create real rows and catch up on missed days. The dashboard's "upcoming" rows come from `upcoming_recurring()` and are never persisted.
+**Recurring:** Vercel Cron (`vercel.json`, 17:00 UTC = 00:00 Bangkok) calls `/api/cron/recurring`, which runs `run_due_recurring()` to create real rows and catch up on missed days. The dashboard's "upcoming" rows come from `upcoming_recurring()` and are never persisted. Saving an entry with a Repeat schedule calls `make_recurring()`, which turns it into a rule linked through `recurring_rule_id` and starts at the next scheduled date after the entry (past dates are skipped, not back-filled). "Last day of the month" is a monthly rule with `anchor_day = 31` (`src/lib/recurring.ts`).
 
 ## Design rules (PRD Part 3)
 

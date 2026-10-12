@@ -117,6 +117,24 @@ await as(A, async () => {
   ok(await fails(`insert into recurring_rules (type, amount, account_id, anchor_day, next_run_date) values ('transfer', 1, $1, 5, '2026-10-05')`, [bank]), 'recurring transfer needs both accounts');
   const up = (await q(`select type::text, to_account_id from upcoming_recurring(10) where type = 'transfer'`)).rows;
   ok(up.length === 1 && up[0].to_account_id === cash, 'upcoming_recurring includes transfers with destination');
+
+  // An entry set to repeat becomes a rule; the entry is the first occurrence.
+  const salary = (await q(`insert into transactions (type, amount, category_id, merchant, account_id, date) values ('income', 42000, $1, 'Acme', $2, '2026-09-15') returning id`, [aSalary, bank])).rows[0].id;
+  const rule = (await q(`select r.*, r.next_run_date::text as next from make_recurring($1, 'monthly', 31, '2026-09-20') r`, [salary])).rows[0];
+  ok(rule.type === 'income' && Number(rule.amount) === 42000 && rule.category_id === aSalary && rule.merchant === 'Acme' && rule.account_id === bank, 'make_recurring copies the entry');
+  ok(rule.anchor_day === 31 && rule.next === '2026-09-30', 'make_recurring: month-end salary first runs at the end of the entry\'s month');
+  ok((await q(`select recurring_rule_id from transactions where id=$1`, [salary])).rows[0].recurring_rule_id === rule.id, 'make_recurring links the entry to its rule');
+  ok(await fails(`select make_recurring($1, 'monthly')`, [salary]), 'an entry can only be made recurring once');
+  const old = (await q(`insert into transactions (amount, date) values (300, '2026-01-10') returning id`)).rows[0].id;
+  const oldRule = (await q(`select r.*, r.next_run_date::text as next from make_recurring($1, 'monthly', null, '2026-04-15') r`, [old])).rows[0];
+  ok(oldRule.anchor_day === 10 && oldRule.next === '2026-05-10', 'make_recurring skips past occurrences instead of back-filling');
+  const draft = (await q(`insert into transactions (type, amount, status, source) values ('expense', 7, 'needs_review', 'ocr') returning id`)).rows[0].id;
+  ok(await fails(`select make_recurring($1, 'monthly')`, [draft]), 'a draft cannot be made recurring');
+});
+const salaryTx = (await q(`select id from transactions where merchant = 'Acme'`)).rows[0].id;
+await as(B, async () => {
+  let err = null; try { await q(`select make_recurring($1, 'monthly')`, [salaryTx]); } catch (e) { err = e.message; }
+  ok(err && /not found/.test(err), 'make_recurring cannot reach another user\'s entry');
 });
 const ran = (await q(`select run_due_recurring('2026-10-05') n`)).rows[0].n;
 const recurTransfer = (await q(`select to_account_id from transactions where source='recurring' and type='transfer'`)).rows;

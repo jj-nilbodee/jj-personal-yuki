@@ -23,6 +23,11 @@ export function todayISO(now = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(now);
 }
 
+/** Last day of the month of an ISO date, as YYYY-MM-DD. */
+export function endOfMonth(iso: string): string {
+  return new Date(Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)), 0)).toISOString().slice(0, 10);
+}
+
 export function formatDay(iso: string, today = todayISO()): string {
   if (iso === today) return 'Today';
   const d = new Date(`${iso}T00:00:00Z`);

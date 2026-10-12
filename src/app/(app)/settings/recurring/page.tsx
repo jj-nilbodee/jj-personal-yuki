@@ -4,11 +4,10 @@ import { BackHeader } from '@/components/back-header';
 import { YukiArt } from '@/components/yuki';
 import { transferLabel } from '@/lib/accounts';
 import { formatDay, formatSigned } from '@/lib/format';
+import { REPEAT_LABEL, repeatOf } from '@/lib/recurring';
 import { requireUser } from '@/lib/supabase/server';
 import type { Account, Category, RecurringRule } from '@/lib/types';
 import { RuleActions } from './rule-actions';
-
-const FREQUENCY = { weekly: 'Every week', monthly: 'Every month', yearly: 'Every year' } as const;
 
 export default async function RecurringPage() {
   const { supabase } = await requireUser();
@@ -45,7 +44,7 @@ export default async function RecurringPage() {
                       ? transferLabel(r.account_id, r.to_account_id, accounts)
                       : (r.merchant ?? categories.get(r.category_id ?? '')?.name ?? 'Recurring')}</span>
                   <span className="block text-sm text-ink-soft">
-                    {r.active ? `${FREQUENCY[r.frequency]} · next ${formatDay(r.next_run_date)}` : 'Paused'}
+                    {r.active ? `${REPEAT_LABEL[repeatOf(r)]} · next ${formatDay(r.next_run_date)}` : 'Paused'}
                   </span>
                 </Link>
                 <span className="num">{formatSigned(r.amount, r.type)}</span>

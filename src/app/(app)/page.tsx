@@ -5,7 +5,7 @@ import { CategoryIcon } from '@/components/category-icon';
 import { TransactionRow, UpcomingRow } from '@/components/transaction-row';
 import { YukiArt } from '@/components/yuki';
 import { groupAccounts, transferLabel } from '@/lib/accounts';
-import { daysUntil, formatBalance, formatMoney, formatMonth, todayISO } from '@/lib/format';
+import { daysUntil, endOfMonth, formatBalance, formatMoney, formatMonth, todayISO } from '@/lib/format';
 import { requireUser } from '@/lib/supabase/server';
 import type { AccountBalance, Category, CategoryTotal, MonthSummary, Transaction, UpcomingRecurring } from '@/lib/types';
 
@@ -13,12 +13,6 @@ function shiftMonth(month: string, by: number) {
   const d = new Date(`${month}-01T00:00:00Z`);
   d.setUTCMonth(d.getUTCMonth() + by);
   return d.toISOString().slice(0, 7);
-}
-
-/** Transactions list for one type within the month. */
-function monthHref(month: string, type: 'income' | 'expense') {
-  const last = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).toISOString().slice(0, 10);
-  return `/transactions?type=${type}&from=${month}-01&to=${last}`;
 }
 
 function dueLabel(date: string) {
@@ -93,6 +87,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const spendingCategories = summary?.categories ?? [];
   const incomeCategories = summary?.income_categories ?? [];
   const nothingYet = recent.length === 0 && drafts.length === 0;
+  // The balance only means something once income is in, so ask for it before anything else.
+  const askForIncome = isCurrent && income === 0 && !nothingYet;
+  const monthRange = `from=${month}-01&to=${endOfMonth(`${month}-01`)}`;
 
   return (
     <div className="grid gap-6">
@@ -133,27 +130,39 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           {formatMoney(Math.abs(balance))}
         </p>
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <Link href={monthHref(month, 'income')} className="rounded-2xl bg-bg p-3">
+          <Link href={`/transactions?type=income&${monthRange}`} className="rounded-2xl bg-bg p-3">
             <p className="flex items-center gap-1 text-sm text-ink-soft">
               <ArrowDownLeft className="size-4 text-income" aria-hidden /> Income
             </p>
             <p className="num mt-1 font-semibold text-income">{formatMoney(income)}</p>
           </Link>
-          <Link href={monthHref(month, 'expense')} className="rounded-2xl bg-bg p-3">
+          <Link href={`/transactions?type=expense&${monthRange}`} className="rounded-2xl bg-bg p-3">
             <p className="flex items-center gap-1 text-sm text-ink-soft">
               <ArrowUpRight className="size-4 text-expense" aria-hidden /> Spent
             </p>
             <p className="num mt-1 font-semibold text-expense">{formatMoney(expense)}</p>
           </Link>
         </div>
+        {askForIncome && (
+          <div className="mt-4 grid gap-3 border-t border-border pt-4">
+            <p className="text-sm">No income logged this month yet. Add it first so the balance shows what&apos;s left.</p>
+            <Link href="/transactions/new?type=income" className="btn btn-quiet">
+              <ArrowDownLeft className="size-5 text-income" aria-hidden /> Add income
+            </Link>
+          </div>
+        )}
       </section>
 
       {nothingYet ? (
         <section className="card flex flex-col items-center gap-4 p-8 text-center">
           <YukiArt pose="asleep" size={120} />
           <p>Nothing logged yet. Yuki&apos;s napping until you add one.</p>
-          <AddButton>
-            <Plus className="size-5" aria-hidden /> Add your first expense
+          <p className="text-sm text-ink-soft">Start with your income so the balance shows what&apos;s left to spend.</p>
+          <Link href="/transactions/new?type=income" className="btn btn-primary">
+            <ArrowDownLeft className="size-5" aria-hidden /> Add your income
+          </Link>
+          <AddButton className="btn btn-quiet">
+            <Plus className="size-5" aria-hidden /> Add an expense
           </AddButton>
         </section>
       ) : (
