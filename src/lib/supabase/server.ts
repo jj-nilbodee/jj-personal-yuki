@@ -21,12 +21,16 @@ export async function createClient() {
   });
 }
 
-/** Signed-in user plus an RLS-scoped client. Redirects to /login otherwise. */
+/**
+ * Signed-in user plus an RLS-scoped client. Redirects to /login otherwise.
+ * getClaims() verifies the JWT locally against the cached JWKS, so this costs
+ * no Auth round trip; Postgres re-checks the same token for every RLS query.
+ */
 export const requireUser = cache(async () => {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) redirect('/login');
-  return { supabase, user: data.user };
+  const { data } = await supabase.auth.getClaims();
+  if (!data) redirect('/login');
+  return { supabase, user: { id: data.claims.sub, email: data.claims.email } };
 });
 
 /** Bypasses RLS. Only for trusted server jobs such as the recurring cron. */

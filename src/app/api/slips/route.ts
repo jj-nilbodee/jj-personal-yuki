@@ -7,8 +7,8 @@ import { todayISO } from '@/lib/format';
 // away, so it shows up in the list before extraction finishes (optimistic UI).
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const { data: auth } = await supabase.auth.getClaims();
+  if (!auth) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const form = await request.formData();
   const image = form.get('image');
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const ext = image.type === 'image/webp' ? 'webp' : image.type === 'image/png' ? 'png' : 'jpg';
-  const path = `${auth.user.id}/${todayISO().slice(0, 4)}/${tx.id}.${ext}`;
+  const path = `${auth.claims.sub}/${todayISO().slice(0, 4)}/${tx.id}.${ext}`;
   const upload = await supabase.storage.from('slips').upload(path, image, { contentType: image.type });
   if (upload.error) {
     await supabase.from('transactions').delete().eq('id', tx.id);

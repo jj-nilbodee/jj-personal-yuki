@@ -10,8 +10,8 @@ const MIN_CONFIDENCE = 0.5;
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const { data: auth } = await supabase.auth.getClaims();
+  if (!auth) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const { data: tx } = await supabase.from('transactions').select('*').eq('id', id).single<Transaction>();
   if (!tx?.slip_path) return NextResponse.json({ error: 'not_found' }, { status: 404 });

@@ -4,7 +4,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 const PUBLIC_PATHS = ['/login', '/auth/'];
 
 // Refreshes the Supabase session cookie on every request and keeps signed-out
-// visitors on /login. Data access is still enforced by RLS, not by this check.
+// visitors on /login. getClaims() verifies the JWT locally (no Auth round trip
+// unless the token needs refreshing). Data access is still enforced by RLS.
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
@@ -18,14 +19,14 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  const { data } = await supabase.auth.getUser();
+  const { data } = await supabase.auth.getClaims();
   const { pathname } = request.nextUrl;
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
-  if (!data.user && !isPublic && !pathname.startsWith('/api/')) {
+  if (!data && !isPublic && !pathname.startsWith('/api/')) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
-  if (data.user && pathname === '/login') {
+  if (data && pathname === '/login') {
     return NextResponse.redirect(new URL('/', request.url));
   }
   return response;
