@@ -6,11 +6,16 @@ import { TransactionRow } from '@/components/transaction-row';
 import { YukiArt } from '@/components/yuki';
 import { formatDay, formatMoney } from '@/lib/format';
 import { requireUser } from '@/lib/supabase/server';
-import type { Account, Category, Transaction } from '@/lib/types';
+import type { Account, Category, Transaction, TxnType } from '@/lib/types';
 
 const PAGE_SIZE = 200;
+const TYPE_FILTERS: { type: TxnType; label: string }[] = [
+  { type: 'income', label: 'Income' },
+  { type: 'expense', label: 'Expenses' },
+  { type: 'transfer', label: 'Transfers' },
+];
 
-type Filters = { q?: string; category?: string; account?: string; from?: string; to?: string; status?: string };
+type Filters = { q?: string; type?: string; category?: string; account?: string; from?: string; to?: string; status?: string };
 
 export default async function TransactionsPage({ searchParams }: { searchParams: Promise<Filters> }) {
   const { supabase } = await requireUser();
@@ -33,6 +38,8 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
         .join(','),
     );
   }
+  const type = TYPE_FILTERS.find((t) => t.type === f.type)?.type;
+  if (type) query = query.eq('type', type);
   if (f.category === 'none') query = query.is('category_id', null).eq('status', 'confirmed');
   else if (f.category) query = query.eq('category_id', f.category);
   // An account's history includes transfers into it. Only a UUID can reach the raw filter string.
@@ -68,17 +75,27 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-soft" aria-hidden />
           <input name="q" defaultValue={f.q} placeholder="Payee, note or amount" className="field pl-10" type="search" />
         </label>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-          <select name="category" defaultValue={f.category ?? ''} className="field" aria-label="Category">
-            <option value="">All categories</option>
-            <option value="none">No category</option>
-            {categoryList.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+          <select name="type" defaultValue={type ?? ''} className="field" aria-label="Type">
+            <option value="">All types</option>
+            {TYPE_FILTERS.map((t) => (
+              <option key={t.type} value={t.type}>
+                {t.label}
               </option>
             ))}
           </select>
-          <select name="account" defaultValue={f.account ?? ''} className="field" aria-label="Account">
+          <select name="category" defaultValue={f.category ?? ''} className="field" aria-label="Category">
+            <option value="">All categories</option>
+            <option value="none">No category</option>
+            {categoryList
+              .filter((c) => !type || c.type === type)
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+          </select>
+          <select name="account" defaultValue={f.account ?? ''} className="field col-span-2 md:col-span-1" aria-label="Account">
             <option value="">All accounts</option>
             <AccountOptions accounts={accounts} selected={f.account} />
           </select>

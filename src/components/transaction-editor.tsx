@@ -22,9 +22,9 @@ type Fields = {
   note: string;
 };
 
-function fieldsFrom(tx?: Partial<Transaction>): Fields {
+function fieldsFrom(tx?: Partial<Transaction>, newType: TxnType = 'expense'): Fields {
   return {
-    type: tx ? (tx.type ?? '') : 'expense',
+    type: tx ? (tx.type ?? '') : newType,
     amount: tx?.amount != null ? String(tx.amount) : '',
     date: tx?.date ?? todayISO(),
     merchant: tx?.merchant ?? '',
@@ -43,16 +43,19 @@ const TYPES = [
 
 export function TransactionEditor({
   tx,
+  newType,
   categories,
   accounts,
   slipUrl,
 }: {
   tx?: Transaction;
+  /** Starting type for a new entry; defaults to expense. */
+  newType?: TxnType;
   categories: Category[];
   accounts: Account[];
   slipUrl?: string | null;
 }) {
-  const [fields, setFields] = useState<Fields>(() => fieldsFrom(tx));
+  const [fields, setFields] = useState<Fields>(() => fieldsFrom(tx, newType));
   const touched = useRef(new Set<keyof Fields>());
   const [status, setStatus] = useState(tx?.status ?? 'confirmed');
   const [extraction, setExtraction] = useState<Extraction | null>(tx?.extraction ?? null);

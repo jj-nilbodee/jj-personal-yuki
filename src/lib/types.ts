@@ -83,12 +83,23 @@ export interface UpcomingRecurring {
   to_account_id: string | null;
 }
 
+export interface CategoryTotal {
+  id: string | null;
+  name: string;
+  icon: string;
+  total: number;
+  count: number;
+}
+
 export interface MonthSummary {
   month: string;
   income: number;
   expense: number;
   count: number;
-  categories: { id: string | null; name: string; icon: string; total: number; count: number }[];
+  /** Spending by category, largest first. */
+  categories: CategoryTotal[];
+  /** Income by category, largest first. */
+  income_categories: CategoryTotal[];
 }
 
 /** Stored in transactions.extraction for auditability. */

@@ -7,7 +7,7 @@ import { YukiArt } from '@/components/yuki';
 import { groupAccounts, transferLabel } from '@/lib/accounts';
 import { daysUntil, formatBalance, formatMoney, formatMonth, todayISO } from '@/lib/format';
 import { requireUser } from '@/lib/supabase/server';
-import type { AccountBalance, Category, MonthSummary, Transaction, UpcomingRecurring } from '@/lib/types';
+import type { AccountBalance, Category, CategoryTotal, MonthSummary, Transaction, UpcomingRecurring } from '@/lib/types';
 
 function shiftMonth(month: string, by: number) {
   const d = new Date(`${month}-01T00:00:00Z`);
@@ -15,11 +15,43 @@ function shiftMonth(month: string, by: number) {
   return d.toISOString().slice(0, 7);
 }
 
+/** Transactions list for one type within the month. */
+function monthHref(month: string, type: 'income' | 'expense') {
+  const last = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).toISOString().slice(0, 10);
+  return `/transactions?type=${type}&from=${month}-01&to=${last}`;
+}
+
 function dueLabel(date: string) {
   const days = daysUntil(date);
   if (days === 0) return 'Due today';
   if (days === 1) return 'Due tomorrow';
   return `Due in ${days} days`;
+}
+
+function CategoryBreakdown({ title, Arrow, bar, rows }: { title: string; Arrow: typeof ArrowUpRight; bar: string; rows: CategoryTotal[] }) {
+  const top = rows.slice(0, 5);
+  const max = Math.max(...top.map((c) => Number(c.total)), 1);
+  return (
+    <section>
+      <h2 className="mb-2 flex items-center gap-1.5 font-bold">
+        <Arrow className="size-4 text-ink-soft" aria-hidden /> {title}
+      </h2>
+      <ul className="card grid gap-4 p-4">
+        {top.map((c) => (
+          <li key={c.id ?? 'none'} className="grid gap-1.5">
+            <div className="flex items-center gap-2">
+              <CategoryIcon name={c.icon} className="size-4 text-ink-soft" />
+              <span className="flex-1 truncate">{c.name}</span>
+              <span className="num text-sm">{formatMoney(c.total)}</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-bg">
+              <div className={`h-full rounded-full ${bar}`} style={{ width: `${(Number(c.total) / max) * 100}%` }} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
@@ -58,8 +90,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const income = Number(summary?.income ?? 0);
   const expense = Number(summary?.expense ?? 0);
   const balance = income - expense;
-  const topCategories = (summary?.categories ?? []).slice(0, 5);
-  const maxCategory = Math.max(...topCategories.map((c) => Number(c.total)), 1);
+  const spendingCategories = summary?.categories ?? [];
+  const incomeCategories = summary?.income_categories ?? [];
   const nothingYet = recent.length === 0 && drafts.length === 0;
 
   return (
@@ -101,18 +133,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           {formatMoney(Math.abs(balance))}
         </p>
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-bg p-3">
+          <Link href={monthHref(month, 'income')} className="rounded-2xl bg-bg p-3">
             <p className="flex items-center gap-1 text-sm text-ink-soft">
               <ArrowDownLeft className="size-4 text-income" aria-hidden /> Income
             </p>
             <p className="num mt-1 font-semibold text-income">{formatMoney(income)}</p>
-          </div>
-          <div className="rounded-2xl bg-bg p-3">
+          </Link>
+          <Link href={monthHref(month, 'expense')} className="rounded-2xl bg-bg p-3">
             <p className="flex items-center gap-1 text-sm text-ink-soft">
               <ArrowUpRight className="size-4 text-expense" aria-hidden /> Spent
             </p>
             <p className="num mt-1 font-semibold text-expense">{formatMoney(expense)}</p>
-          </div>
+          </Link>
         </div>
       </section>
 
@@ -137,24 +169,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </section>
           )}
 
-          {topCategories.length > 0 && (
-            <section>
-              <h2 className="mb-2 font-bold">Top categories</h2>
-              <ul className="card grid gap-4 p-4">
-                {topCategories.map((c) => (
-                  <li key={c.id ?? 'none'} className="grid gap-1.5">
-                    <div className="flex items-center gap-2">
-                      <CategoryIcon name={c.icon} className="size-4 text-ink-soft" />
-                      <span className="flex-1 truncate">{c.name}</span>
-                      <span className="num text-sm">{formatMoney(c.total)}</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-bg">
-                      <div className="h-full rounded-full bg-accent" style={{ width: `${(Number(c.total) / maxCategory) * 100}%` }} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </section>
+          {spendingCategories.length > 0 && (
+            <CategoryBreakdown title="Spending by category" Arrow={ArrowUpRight} bar="bg-accent" rows={spendingCategories} />
+          )}
+
+          {incomeCategories.length > 0 && (
+            <CategoryBreakdown title="Income by category" Arrow={ArrowDownLeft} bar="bg-income" rows={incomeCategories} />
           )}
 
           {upcoming.length > 0 && (

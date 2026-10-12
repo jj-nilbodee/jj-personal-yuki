@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Camera, PenLine, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Camera, X } from 'lucide-react';
 import { prepareSlip } from '@/lib/slip/prepare';
 import { formatDay, formatMoney } from '@/lib/format';
 import { PawProgress } from './yuki';
@@ -83,9 +83,14 @@ export function AddSheetProvider({ children }: { children: React.ReactNode }) {
                 <button className="btn btn-primary h-16 text-base" onClick={() => fileRef.current?.click()} autoFocus>
                   <Camera className="size-5" /> Scan or upload a slip
                 </button>
-                <Link href="/transactions/new" onClick={close} className="btn btn-quiet h-14">
-                  <PenLine className="size-5" /> Enter manually
-                </Link>
+                <div className="grid grid-cols-2 gap-3">
+                  <Link href="/transactions/new" onClick={close} className="btn btn-quiet h-14">
+                    <ArrowUpRight className="size-5 text-expense" aria-hidden /> Expense
+                  </Link>
+                  <Link href="/transactions/new?type=income" onClick={close} className="btn btn-quiet h-14">
+                    <ArrowDownLeft className="size-5 text-income" aria-hidden /> Income
+                  </Link>
+                </div>
               </div>
             )}
 

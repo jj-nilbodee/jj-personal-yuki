@@ -30,6 +30,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
 ok((await q(`select count(*)::int n from categories where user_id=$1`, [A])).rows[0].n === 14, 'default categories seeded');
 const bCat = (await q(`select id from categories where user_id=$1 limit 1`, [B])).rows[0].id;
 const aFood = (await q(`select id from categories where user_id=$1 and name='Food & Dining'`, [A])).rows[0].id;
+const aSalary = (await q(`select id from categories where user_id=$1 and name='Salary'`, [A])).rows[0].id;
 
 await as(A, async () => {
   ok((await q(`select count(*)::int n from categories`)).rows[0].n === 14, 'RLS: A sees only own categories');
@@ -42,12 +43,13 @@ await as(A, async () => {
   await q(`insert into transactions (amount, status, source) values (null, 'processing', 'qr')`);
   await q(`insert into transactions (amount, merchant, category_id, date, bank_ref) values (120.50, 'Cafe Amazon', $1, '2026-09-10', 'REF1')`, [aFood]);
   await q(`insert into transactions (amount, merchant, date) values (99.25, 'Mystery', '2026-09-11')`);
-  await q(`insert into transactions (type, amount, date) values ('income', 50000, '2026-09-01')`);
+  await q(`insert into transactions (type, amount, category_id, date) values ('income', 50000, $1, '2026-09-01')`, [aSalary]);
   err = null; try { await q(`insert into transactions (amount, bank_ref) values (5, 'REF1')`); } catch (e) { err = e.message; }
   ok(err && /duplicate key/.test(err), 'duplicate bank_ref rejected');
   const s = (await q(`select month_summary('2026-09-15') s`)).rows[0].s;
   console.log('  summary', JSON.stringify(s));
   ok(Number(s.expense) === 219.75 && Number(s.income) === 50000 && s.categories[0].name === 'Food & Dining', 'month_summary totals & ordering (excludes processing)');
+  ok(s.categories.every((c) => c.name !== 'Salary') && s.income_categories.length === 1 && s.income_categories[0].name === 'Salary' && Number(s.income_categories[0].total) === 50000, 'month_summary splits income categories from spending');
   ok((await q(`select suggest_category(' cafe amazon ') c`)).rows[0].c === aFood, 'suggest_category by merchant history');
   let e2 = null; try { await q(`select run_due_recurring()`); } catch (e) { e2 = e.message; }
   ok(e2 && /permission denied/.test(e2), 'authenticated cannot run cron function');
@@ -94,6 +96,7 @@ await as(A, async () => {
   const s = (await q(`select month_summary('2026-09-15') s`)).rows[0].s;
   // 219.75 earlier + 200 card spend + 15,000 rent from the cron run above; transfers add nothing.
   ok(Number(s.expense) === 15419.75 && Number(s.income) === 53000, 'month_summary ignores transfers');
+  ok(s.income_categories.map((c) => `${c.name}:${Number(c.total)}`).join() === 'Salary:50000,Uncategorized:3000', 'income categories ordered by total, uncategorized income included');
 
   const fails = async (sql, params) => { try { await q(sql, params); return false; } catch { return true; } };
   ok(await fails(`insert into transactions (type, amount, account_id) values ('transfer', 5, $1)`, [bank]), 'confirmed transfer needs both accounts');
