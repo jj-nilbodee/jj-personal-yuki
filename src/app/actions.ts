@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { endOfMonth } from '@/lib/format';
 import { parseRepeat, scheduleFor } from '@/lib/recurring';
 import { requireUser } from '@/lib/supabase/server';
-import type { AccountType, CategoryType, TxnType } from '@/lib/types';
+import { ONBOARDING_STEPS, type AccountType, type CategoryType, type OnboardingStep, type Profile, type TxnType } from '@/lib/types';
 
 export type ActionResult = { error?: string } | undefined;
 
@@ -31,6 +31,7 @@ function typedFields(form: FormData): { error: string } | { fields: Record<strin
   if (!type || !TXN_TYPES.includes(type)) return { error: 'Choose money out, money in, or a transfer.' };
   const account_id = str(form, 'account_id');
   if (type !== 'transfer') {
+    if (!account_id) return { error: 'Pick the account this money went through.' };
     return { fields: { type, account_id, to_account_id: null, category_id: str(form, 'category_id'), merchant: str(form, 'merchant') } };
   }
   const to_account_id = str(form, 'to_account_id');
@@ -41,6 +42,12 @@ function typedFields(form: FormData): { error: string } | { fields: Record<strin
 
 function refresh() {
   revalidatePath('/', 'layout');
+}
+
+/** In-app path from the form's `return_to`, never another origin. */
+function returnTo(form: FormData): string | null {
+  const path = str(form, 'return_to');
+  return path?.startsWith('/') && !path.startsWith('//') ? path : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,8 +95,7 @@ export async function saveTransaction(_prev: ActionResult, form: FormData): Prom
     }
   }
   refresh();
-  const returnTo = str(form, 'return_to');
-  redirect(returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/transactions');
+  redirect(returnTo(form) ?? '/transactions');
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
@@ -150,11 +156,18 @@ export async function saveAccount(_prev: ActionResult, form: FormData): Promise<
     if (balError) return { error: balError.message };
   }
   refresh();
+  await continueOnboarding(form);
 }
 
 export async function setAccountArchived(id: string, archived: boolean): Promise<void> {
   const { supabase } = await requireUser();
   await supabase.from('accounts').update({ archived }).eq('id', id);
+  refresh();
+}
+
+export async function setDefaultAccount(id: string): Promise<void> {
+  const { supabase } = await requireUser();
+  await supabase.rpc('set_default_account', { p_account: id });
   refresh();
 }
 
@@ -188,7 +201,7 @@ export async function saveRecurring(_prev: ActionResult, form: FormData): Promis
     : await supabase.from('recurring_rules').insert(row);
   if (error) return { error: error.message };
   refresh();
-  redirect('/settings/recurring');
+  redirect(returnTo(form) ?? '/settings/recurring');
 }
 
 export async function setRecurringActive(id: string, active: boolean): Promise<void> {
@@ -202,6 +215,72 @@ export async function deleteRecurring(id: string): Promise<void> {
   await supabase.from('recurring_rules').delete().eq('id', id);
   refresh();
   redirect('/settings/recurring');
+}
+
+// ---------------------------------------------------------------------------
+// Profile & onboarding
+// ---------------------------------------------------------------------------
+
+/**
+ * Onboarding forms carry the step they answer in `onboarding_step`. Once the
+ * answer is saved, finish that step and show the next one (or the dashboard).
+ */
+async function continueOnboarding(form: FormData): Promise<void> {
+  const step = str(form, 'onboarding_step');
+  if (!ONBOARDING_STEPS.some((s) => s === step)) return;
+  const { supabase } = await requireUser();
+  await supabase.rpc('finish_onboarding_step', { p_step: step });
+  refresh();
+  redirect('/welcome');
+}
+
+export async function skipOnboardingStep(step: OnboardingStep): Promise<void> {
+  const { supabase } = await requireUser();
+  await supabase.rpc('finish_onboarding_step', { p_step: step });
+  refresh();
+  redirect('/welcome');
+}
+
+/** Name and monthly budget. Only fields present in the form change; a blank field clears it. */
+export async function saveProfile(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+  const row: Partial<Pick<Profile, 'display_name' | 'monthly_budget'>> = {};
+  if (form.has('display_name')) {
+    const name = str(form, 'display_name');
+    if (name && name.length > 40) return { error: 'Keep the name to 40 characters.' };
+    row.display_name = name;
+  }
+  if (form.has('monthly_budget')) {
+    const raw = str(form, 'monthly_budget');
+    const budget = parseAmount(raw);
+    if (raw && !budget) return { error: 'Enter the budget as an amount above zero.' };
+    row.monthly_budget = budget;
+  }
+  const { error } = await supabase.from('profiles').update(row).eq('user_id', user.id);
+  if (error) return { error: error.message };
+  refresh();
+  await continueOnboarding(form);
+}
+
+/** A monthly salary from onboarding: becomes an income rule, and this month's pay is logged if it already came in. */
+export async function saveSalary(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  const amount = parseAmount(str(form, 'amount'));
+  if (!amount) return { error: 'Enter your salary as an amount above zero.' };
+  const payday = Number(str(form, 'payday'));
+  if (!Number.isInteger(payday) || payday < 1 || payday > 31) return { error: 'Pick your payday.' };
+  const account = str(form, 'account_id');
+  if (!account) return { error: 'Pick the account your salary goes into.' };
+  const { error } = await supabase.rpc('start_salary', {
+    p_amount: amount,
+    p_anchor_day: payday,
+    p_account: account,
+    p_category: str(form, 'category_id'),
+    p_already_paid: form.get('already_paid') === 'on',
+  });
+  if (error) return { error: error.message };
+  refresh();
+  await continueOnboarding(form);
 }
 
 // ---------------------------------------------------------------------------

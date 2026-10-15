@@ -14,7 +14,21 @@ export interface Account {
   type: AccountType;
   bank_code: string | null;
   archived: boolean;
+  /** The account new entries start on. Exactly one per user, never hidden. */
+  is_default: boolean;
   opening_balance: number;
+}
+
+/** Onboarding steps in order; profiles.onboarding_step is null once all are done. */
+export const ONBOARDING_STEPS = ['name', 'account', 'salary', 'bills', 'budget'] as const;
+export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
+
+export interface Profile {
+  user_id: string;
+  /** What Yuki calls the user at his touchpoints. */
+  display_name: string | null;
+  monthly_budget: number | null;
+  onboarding_step: OnboardingStep | null;
 }
 
 /** Row from account_balances(). Negative on a credit card means money owed. */
@@ -24,6 +38,7 @@ export interface AccountBalance {
   type: AccountType;
   bank_code: string | null;
   archived: boolean;
+  is_default: boolean;
   balance: number;
 }
 
@@ -96,6 +111,10 @@ export interface MonthSummary {
   income: number;
   expense: number;
   count: number;
+  /** The monthly spending budget, or null if none is set. */
+  budget: number | null;
+  /** Budget minus this month's spending; negative when over. */
+  budget_left: number | null;
   /** Spending by category, largest first. */
   categories: CategoryTotal[];
   /** Income by category, largest first. */

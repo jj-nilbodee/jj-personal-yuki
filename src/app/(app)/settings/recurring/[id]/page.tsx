@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import { BackHeader } from '@/components/back-header';
+import { RuleForm } from '@/components/rule-form';
 import { requireUser } from '@/lib/supabase/server';
 import type { Account, Category, RecurringRule } from '@/lib/types';
-import { RuleForm } from '../rule-form';
 
 // Serves both /settings/recurring/new and /settings/recurring/<id>.
 export default async function RecurringRulePage({ params }: { params: Promise<{ id: string }> }) {

@@ -1,9 +1,11 @@
+import { redirect } from 'next/navigation';
 import { AddSheetProvider } from '@/components/add-sheet';
 import { AppNav } from '@/components/app-nav';
-import { requireUser } from '@/lib/supabase/server';
+import { getProfile } from '@/lib/profile';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  await requireUser();
+  // First use runs through onboarding (/welcome) before the app itself.
+  if ((await getProfile())?.onboarding_step) redirect('/welcome');
   return (
     <AddSheetProvider>
       <div className="md:flex">

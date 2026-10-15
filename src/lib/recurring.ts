@@ -8,7 +8,7 @@ export type Repeat = Frequency | 'month_end';
 
 export const REPEATS: Repeat[] = ['weekly', 'monthly', 'month_end', 'yearly'];
 
-const MONTH_END_ANCHOR = 31;
+export const MONTH_END_ANCHOR = 31;
 
 export const REPEAT_LABEL: Record<Repeat, string> = {
   weekly: 'Every week',
@@ -30,7 +30,7 @@ export function repeatOf(rule: Pick<RecurringRule, 'frequency' | 'anchor_day'>):
   return rule.frequency === 'monthly' && rule.anchor_day === MONTH_END_ANCHOR ? 'month_end' : rule.frequency;
 }
 
-function ordinal(n: number): string {
+export function ordinal(n: number): string {
   const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
   return `${n}${suffix}`;
 }

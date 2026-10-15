@@ -2,10 +2,12 @@ import Link from 'next/link';
 import { ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { AddButton } from '@/components/add-sheet';
 import { CategoryIcon } from '@/components/category-icon';
+import { EmptyLedger } from '@/components/empty-ledger';
 import { TransactionRow, UpcomingRow } from '@/components/transaction-row';
 import { YukiArt } from '@/components/yuki';
 import { groupAccounts, transferLabel } from '@/lib/accounts';
 import { daysUntil, endOfMonth, formatBalance, formatMoney, formatMonth, todayISO } from '@/lib/format';
+import { getProfile } from '@/lib/profile';
 import { requireUser } from '@/lib/supabase/server';
 import type { AccountBalance, Category, CategoryTotal, MonthSummary, Transaction, UpcomingRecurring } from '@/lib/types';
 
@@ -55,7 +57,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const month = requested && /^\d{4}-\d{2}$/.test(requested) ? requested : current;
   const isCurrent = month === current;
 
-  const [summaryRes, recentRes, draftsRes, upcomingRes, nudgesRes, categoriesRes, balancesRes] = await Promise.all([
+  const [summaryRes, recentRes, draftsRes, upcomingRes, nudgesRes, categoriesRes, balancesRes, profile, incomeRuleRes] = await Promise.all([
     supabase.rpc('month_summary', { p_month: `${month}-01` }),
     supabase
       .from('transactions')
@@ -69,6 +71,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     supabase.rpc('protective_nudges'),
     supabase.from('categories').select('*'),
     supabase.rpc('account_balances'),
+    getProfile(),
+    supabase.from('recurring_rules').select('id').eq('type', 'income').eq('active', true).limit(1),
   ]);
 
   const summary = summaryRes.data as MonthSummary | null;
@@ -87,12 +91,37 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const spendingCategories = summary?.categories ?? [];
   const incomeCategories = summary?.income_categories ?? [];
   const nothingYet = recent.length === 0 && drafts.length === 0;
+  const toName = profile?.display_name ? `, ${profile.display_name}` : '';
+  // The budget is about the month in progress; past months just show what happened.
+  const budget = isCurrent && summary?.budget != null ? Number(summary.budget) : null;
+  const budgetLeft = Number(summary?.budget_left ?? 0);
+  // A salary set to log itself shouldn't also be asked for by hand, or it would be counted twice.
+  const salaryScheduled = (incomeRuleRes.data ?? []).length > 0;
   // The balance only means something once income is in, so ask for it before anything else.
-  const askForIncome = isCurrent && income === 0 && !nothingYet;
+  const askForIncome = isCurrent && income === 0 && !nothingYet && !salaryScheduled;
   const monthRange = `from=${month}-01&to=${endOfMonth(`${month}-01`)}`;
 
+  const upcomingSection = upcoming.length > 0 && (
+    <section>
+      <h2 className="mb-2 font-bold">Upcoming</h2>
+      <div className="grid gap-2">
+        {upcoming.slice(0, 5).map((u) => (
+          <UpcomingRow
+            key={`${u.rule_id}-${u.due_date}`}
+            merchant={u.type === 'transfer' ? transferLabel(u.account_id, u.to_account_id, accounts) : u.merchant}
+            amount={u.amount}
+            type={u.type}
+            dueLabel={dueLabel(u.due_date)}
+            category={categories.get(u.category_id ?? '')}
+          />
+        ))}
+      </div>
+    </section>
+  );
+
   return (
-    <div className="grid gap-6">
+    // grid-cols-1 (minmax(0, 1fr)): long payee or bill names truncate instead of widening the page.
+    <div className="grid grid-cols-1 gap-6">
       <header className="flex items-center justify-between">
         <Link href={`/?month=${shiftMonth(month, -1)}`} className="grid size-11 place-items-center rounded-full" aria-label="Previous month">
           <ChevronLeft className="size-5" />
@@ -115,7 +144,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         >
           <YukiArt pose="sitting" size={56} />
           <p className="font-medium">
-            Yuki is sitting on this until it&apos;s done:{' '}
+            Yuki is sitting on this until it&apos;s done{toName}:{' '}
             {n.kind === 'uncategorized'
               ? `${n.count} entries have no category.`
               : `${n.count} ${n.count === 1 ? 'slip is' : 'slips are'} waiting for a check.`}
@@ -143,6 +172,27 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <p className="num mt-1 font-semibold text-expense">{formatMoney(expense)}</p>
           </Link>
         </div>
+        {budget !== null && (
+          <div className="mt-4 grid gap-2 border-t border-border pt-4">
+            <p className="flex items-baseline justify-between gap-3 text-sm">
+              <span>{budgetLeft >= 0 ? 'Left to spend' : 'Over budget'}</span>
+              <span className="num font-semibold">{formatMoney(Math.abs(budgetLeft))}</span>
+            </p>
+            <div
+              className="h-2 overflow-hidden rounded-full bg-bg"
+              role="progressbar"
+              aria-label="Budget spent"
+              aria-valuemin={0}
+              aria-valuemax={budget}
+              aria-valuenow={Math.min(expense, budget)}
+            >
+              <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, (expense / budget) * 100)}%` }} />
+            </div>
+            <p className="num text-xs text-ink-soft">
+              {formatMoney(expense)} of {formatMoney(budget)}
+            </p>
+          </div>
+        )}
         {askForIncome && (
           <div className="mt-4 grid gap-3 border-t border-border pt-4">
             <p className="text-sm">No income logged this month yet. Add it first so the balance shows what&apos;s left.</p>
@@ -154,17 +204,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </section>
 
       {nothingYet ? (
-        <section className="card flex flex-col items-center gap-4 p-8 text-center">
-          <YukiArt pose="asleep" size={120} />
-          <p>Nothing logged yet. Yuki&apos;s napping until you add one.</p>
-          <p className="text-sm text-ink-soft">Start with your income so the balance shows what&apos;s left to spend.</p>
-          <Link href="/transactions/new?type=income" className="btn btn-primary">
-            <ArrowDownLeft className="size-5" aria-hidden /> Add your income
-          </Link>
-          <AddButton className="btn btn-quiet">
-            <Plus className="size-5" aria-hidden /> Add an expense
-          </AddButton>
-        </section>
+        <EmptyLedger name={profile?.display_name ?? null} salaryScheduled={salaryScheduled} />
       ) : (
         <>
           {drafts.length > 0 && (
@@ -186,23 +226,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <CategoryBreakdown title="Income by category" Arrow={ArrowDownLeft} bar="bg-income" rows={incomeCategories} />
           )}
 
-          {upcoming.length > 0 && (
-            <section>
-              <h2 className="mb-2 font-bold">Upcoming</h2>
-              <div className="grid gap-2">
-                {upcoming.slice(0, 5).map((u) => (
-                  <UpcomingRow
-                    key={`${u.rule_id}-${u.due_date}`}
-                    merchant={u.type === 'transfer' ? transferLabel(u.account_id, u.to_account_id, accounts) : u.merchant}
-                    amount={u.amount}
-                    type={u.type}
-                    dueLabel={dueLabel(u.due_date)}
-                    category={categories.get(u.category_id ?? '')}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
+          {upcomingSection}
 
           <section>
             <div className="mb-2 flex items-baseline justify-between">
@@ -219,6 +243,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </section>
         </>
       )}
+
+      {nothingYet && upcomingSection}
 
       {accountGroups.length > 0 && (
         <section>

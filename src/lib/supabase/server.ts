@@ -30,7 +30,10 @@ export const requireUser = cache(async () => {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   if (!data) redirect('/login');
-  return { supabase, user: { id: data.claims.sub, email: data.claims.email } };
+  const meta = data.claims.user_metadata;
+  // Google sign-in fills full_name; onboarding offers its first word as what Yuki calls the user.
+  const name = typeof meta?.full_name === 'string' ? meta.full_name : typeof meta?.name === 'string' ? meta.name : null;
+  return { supabase, user: { id: data.claims.sub, email: data.claims.email, name } };
 });
 
 /** Bypasses RLS. Only for trusted server jobs such as the recurring cron. */

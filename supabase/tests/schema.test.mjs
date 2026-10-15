@@ -31,20 +31,47 @@ ok((await q(`select count(*)::int n from categories where user_id=$1`, [A])).row
 const bCat = (await q(`select id from categories where user_id=$1 limit 1`, [B])).rows[0].id;
 const aFood = (await q(`select id from categories where user_id=$1 and name='Food & Dining'`, [A])).rows[0].id;
 const aSalary = (await q(`select id from categories where user_id=$1 and name='Salary'`, [A])).rows[0].id;
+ok((await q(`select count(*)::int n from accounts`)).rows[0].n === 0, 'new users start without an account and name their first one');
+
+// Onboarding: name → account → salary → bills → budget, one step at a time.
+const step = async () => (await q(`select onboarding_step s from profiles`)).rows[0]?.s ?? null;
+await as(A, async () => {
+  ok((await q(`select count(*)::int n from profiles`)).rows[0].n === 1 && (await step()) === 'name', 'new users start onboarding at the name step');
+  await q(`update profiles set display_name = 'Jay'`);
+  await q(`select finish_onboarding_step('name')`);
+  await q(`select finish_onboarding_step('name')`);
+  ok((await step()) === 'account', 'finishing a step twice only advances once');
+  await q(`select finish_onboarding_step('account')`);
+  ok((await step()) === 'account', 'the account step needs an account');
+});
+const aCash = await as(A, async () => (await q(`insert into accounts (name, type) values ('Cash', 'cash') returning id, is_default`)).rows[0]);
+ok(aCash.is_default, 'first account becomes the default');
+const cashId = aCash.id;
+await as(A, async () => {
+  await q(`select finish_onboarding_step('account')`);
+  ok((await step()) === 'salary', 'the account step finishes once an account exists');
+  await q(`select finish_onboarding_step('budget')`);
+  ok((await step()) === 'salary', 'a later step cannot be finished early');
+  for (const s of ['salary', 'bills', 'budget']) await q(`select finish_onboarding_step($1)`, [s]);
+  ok((await step()) === null, 'finishing the budget step ends onboarding');
+});
+await as(B, async () => {
+  ok((await q(`select display_name from profiles`)).rows.every((r) => r.display_name === null), 'RLS: B sees only own profile');
+});
 
 await as(A, async () => {
   ok((await q(`select count(*)::int n from categories`)).rows[0].n === 14, 'RLS: A sees only own categories');
-  let err = null; try { await q(`insert into transactions (amount, category_id) values (10, $1)`, [bCat]); } catch (e) { err = e.message; }
+  let err = null; try { await q(`insert into transactions (amount, account_id, category_id) values (10, $1, $2)`, [cashId, bCat]); } catch (e) { err = e.message; }
   ok(err && /foreign key/.test(err), 'cannot reference another user\'s category');
   err = null; try { await q(`insert into transactions (user_id, amount) values ($1, 10)`, [B]); } catch (e) { err = e.message; }
   ok(err && /row-level security/.test(err), 'cannot insert rows for another user');
   err = null; try { await q(`insert into transactions (amount, status) values (null, 'confirmed')`); } catch (e) { err = e.message; }
   ok(err && /check/.test(err), 'confirmed requires amount');
   await q(`insert into transactions (amount, status, source) values (null, 'processing', 'qr')`);
-  await q(`insert into transactions (amount, merchant, category_id, date, bank_ref) values (120.50, 'Cafe Amazon', $1, '2026-09-10', 'REF1')`, [aFood]);
-  await q(`insert into transactions (amount, merchant, date) values (99.25, 'Mystery', '2026-09-11')`);
-  await q(`insert into transactions (type, amount, category_id, date) values ('income', 50000, $1, '2026-09-01')`, [aSalary]);
-  err = null; try { await q(`insert into transactions (amount, bank_ref) values (5, 'REF1')`); } catch (e) { err = e.message; }
+  await q(`insert into transactions (amount, merchant, category_id, account_id, date, bank_ref) values (120.50, 'Cafe Amazon', $1, $2, '2026-09-10', 'REF1')`, [aFood, cashId]);
+  await q(`insert into transactions (amount, merchant, account_id, date) values (99.25, 'Mystery', $1, '2026-09-11')`, [cashId]);
+  await q(`insert into transactions (type, amount, category_id, account_id, date) values ('income', 50000, $1, $2, '2026-09-01')`, [aSalary, cashId]);
+  err = null; try { await q(`insert into transactions (amount, account_id, bank_ref) values (5, $1, 'REF1')`, [cashId]); } catch (e) { err = e.message; }
   ok(err && /duplicate key/.test(err), 'duplicate bank_ref rejected');
   const s = (await q(`select month_summary('2026-09-15') s`)).rows[0].s;
   console.log('  summary', JSON.stringify(s));
@@ -53,7 +80,7 @@ await as(A, async () => {
   ok((await q(`select suggest_category(' cafe amazon ') c`)).rows[0].c === aFood, 'suggest_category by merchant history');
   let e2 = null; try { await q(`select run_due_recurring()`); } catch (e) { e2 = e.message; }
   ok(e2 && /permission denied/.test(e2), 'authenticated cannot run cron function');
-  await q(`insert into recurring_rules (amount, merchant, anchor_day, next_run_date) values (15000, 'Rent', 31, '2026-08-31')`);
+  await q(`insert into recurring_rules (amount, merchant, account_id, anchor_day, next_run_date) values (15000, 'Rent', $1, 31, '2026-08-31')`, [cashId]);
 });
 await as(B, async () => {
   ok((await q(`select count(*)::int n from transactions`)).rows[0].n === 0, 'RLS: B sees none of A\'s transactions');
@@ -92,7 +119,8 @@ await as(A, async () => {
   await q(`insert into transactions (type, amount, account_id, to_account_id, date) values ('transfer', 300, $1, $2, '2026-09-14')`, [bank, cash]);
   const bal = Object.fromEntries((await q(`select name, balance from account_balances()`)).rows.map((r) => [r.name, Number(r.balance)]));
   console.log('  balances', JSON.stringify(bal));
-  ok(bal.KBank === 12000 && bal.Visa === 0 && bal.Cash === 300, 'account_balances: income, expense and transfers in/out');
+  // Cash also carries the earlier entries: 50,000 salary − 219.75 spending − 2 × 15,000 rent, plus the 300 transfer in.
+  ok(bal.KBank === 12000 && bal.Visa === 0 && bal.Cash === 20080.25, 'account_balances: income, expense and transfers in/out');
   await q(`select set_account_balance($1, 11500.25)`, [bank]);
   ok(Number((await q(`select balance from account_balances() where id=$1`, [bank])).rows[0].balance) === 11500.25, 'set_account_balance sets the current balance');
 
@@ -100,16 +128,63 @@ await as(A, async () => {
   // 219.75 earlier + 200 card spend + 15,000 rent from the cron run above; transfers add nothing.
   ok(Number(s.expense) === 15419.75 && Number(s.income) === 53000, 'month_summary ignores transfers');
   ok(s.income_categories.map((c) => `${c.name}:${Number(c.total)}`).join() === 'Salary:50000,Uncategorized:3000', 'income categories ordered by total, uncategorized income included');
+  ok(s.budget === null && s.budget_left === null, 'month_summary: no budget until one is set');
+  await q(`update profiles set monthly_budget = 20000`);
+  const sb = (await q(`select month_summary('2026-09-15') s`)).rows[0].s;
+  ok(Number(sb.budget) === 20000 && Number(sb.budget_left) === 4580.25, 'month_summary: budget left after spending');
+  await q(`update profiles set monthly_budget = 15000`);
+  ok(Number((await q(`select month_summary('2026-09-15') s`)).rows[0].s.budget_left) === -419.75, 'month_summary: over budget is negative');
 
   const fails = async (sql, params) => { try { await q(sql, params); return false; } catch { return true; } };
   ok(await fails(`insert into transactions (type, amount, account_id) values ('transfer', 5, $1)`, [bank]), 'confirmed transfer needs both accounts');
   ok(await fails(`insert into transactions (type, amount, account_id, to_account_id) values ('transfer', 5, $1, $1)`, [bank]), 'transfer needs two different accounts');
   ok(await fails(`insert into transactions (type, amount, account_id, to_account_id, category_id) values ('transfer', 5, $1, $2, $3)`, [bank, card, aFood]), 'transfer has no category');
-  ok(await fails(`insert into transactions (amount, to_account_id) values (5, $1)`, [bank]), 'only transfers have a destination account');
+  ok(await fails(`insert into transactions (amount, account_id, to_account_id) values (5, $1, $2)`, [cash, bank]), 'only transfers have a destination account');
   ok(await fails(`insert into categories (name, type) values ('Moves', 'transfer')`), 'no transfer categories');
   ok(await fails(`insert into transactions (type, amount) values (null, 5)`), 'confirmed entry needs a type');
   await q(`insert into transactions (type, amount, status, source) values (null, 42, 'needs_review', 'ocr')`);
   ok(true, 'slip draft may wait without a type');
+  ok(await fails(`insert into transactions (amount) values (5)`), 'confirmed expense needs an account');
+  ok(await fails(`insert into transactions (type, amount) values ('income', 5)`), 'confirmed income needs an account');
+  ok(await fails(`insert into recurring_rules (amount, anchor_day, next_run_date) values (5, 5, '2026-10-05')`), 'recurring rule needs an account');
+  ok(await fails(`delete from accounts where id=$1`, [cash]), 'an account with entries cannot be deleted');
+
+  const defaults = async () => (await q(`select name from account_balances() where is_default`)).rows.map((r) => r.name).join();
+  ok((await defaults()) === 'Cash', 'later accounts do not take over the default');
+  ok(await fails(`update accounts set archived = true where id=$1`, [cash]), 'the default account cannot be hidden');
+  ok(await fails(`update accounts set is_default = true where id=$1`, [bank]), 'only one default account');
+  await q(`update accounts set archived = true where id=$1`, [card]);
+  ok(await fails(`select set_default_account($1)`, [card]), 'a hidden account cannot become the default');
+  await q(`update accounts set archived = false where id=$1`, [card]);
+  await q(`select set_default_account($1)`, [bank]);
+  ok((await defaults()) === 'KBank', 'set_default_account moves the default');
+  await q(`select set_default_account($1)`, [cash]);
+
+  // Salary from onboarding, with "today" pinned to 20 Oct 2026.
+  const startSalary = async (day, paid) => {
+    const r = (await q(`select r.id, r.next_run_date::text as next from start_salary(30000, $1, $2, $3, $4, '2026-10-20') r`, [day, bank, aSalary, paid])).rows[0];
+    const logged = (await q(`select date::text d, type::text, account_id, category_id from transactions where recurring_rule_id=$1`, [r.id])).rows;
+    return { ...r, logged };
+  };
+  let sal = await startSalary(25, false);
+  ok(sal.next === '2026-10-25' && sal.logged.length === 0, 'start_salary: payday still ahead this month');
+  sal = await startSalary(25, true);
+  ok(sal.next === '2026-10-25' && sal.logged.length === 0, 'start_salary: "already paid" ignored before payday');
+  sal = await startSalary(5, false);
+  ok(sal.next === '2026-11-05' && sal.logged.length === 0, 'start_salary: missed payday is not back-filled');
+  sal = await startSalary(5, true);
+  ok(sal.next === '2026-11-05' && sal.logged.length === 1 && sal.logged[0].d === '2026-10-05' && sal.logged[0].type === 'income'
+    && sal.logged[0].account_id === bank && sal.logged[0].category_id === aSalary, 'start_salary: logs this month\'s pay when already paid');
+  sal = await startSalary(20, true);
+  ok(sal.next === '2026-11-20' && sal.logged[0]?.d === '2026-10-20', 'start_salary: paid today');
+  sal = await startSalary(20, false);
+  ok(sal.next === '2026-10-20' && sal.logged.length === 0, 'start_salary: payday today, not in yet');
+  const monthEnd = (await q(`select next_run_date::text n from start_salary(30000, 31, $1, null, false, '2026-02-10')`, [bank])).rows[0].n;
+  ok(monthEnd === '2026-02-28', 'start_salary: last day of a short month');
+  ok(await fails(`select start_salary(30000, 0, $1)`, [bank]), 'start_salary: payday must be a day of the month');
+  // Keep the cron run below about the transfer rule only.
+  await q(`delete from transactions where recurring_rule_id in (select id from recurring_rules where type = 'income')`);
+  await q(`delete from recurring_rules where type = 'income'`);
 
   const uncategorized = async () => (await q(`select count::int n from protective_nudges() where kind = 'uncategorized'`)).rows[0]?.n ?? 0;
   const before = await uncategorized();
@@ -128,7 +203,7 @@ await as(A, async () => {
   ok(rule.anchor_day === 31 && rule.next === '2026-09-30', 'make_recurring: month-end salary first runs at the end of the entry\'s month');
   ok((await q(`select recurring_rule_id from transactions where id=$1`, [salary])).rows[0].recurring_rule_id === rule.id, 'make_recurring links the entry to its rule');
   ok(await fails(`select make_recurring($1, 'monthly')`, [salary]), 'an entry can only be made recurring once');
-  const old = (await q(`insert into transactions (amount, date) values (300, '2026-01-10') returning id`)).rows[0].id;
+  const old = (await q(`insert into transactions (amount, account_id, date) values (300, $1, '2026-01-10') returning id`, [cash])).rows[0].id;
   const oldRule = (await q(`select r.*, r.next_run_date::text as next from make_recurring($1, 'monthly', null, '2026-04-15') r`, [old])).rows[0];
   ok(oldRule.anchor_day === 10 && oldRule.next === '2026-05-10', 'make_recurring skips past occurrences instead of back-filling');
   const draft = (await q(`insert into transactions (type, amount, status, source) values ('expense', 7, 'needs_review', 'ocr') returning id`)).rows[0].id;
@@ -138,6 +213,8 @@ const salaryTx = (await q(`select id from transactions where merchant = 'Acme'`)
 await as(B, async () => {
   let err = null; try { await q(`select make_recurring($1, 'monthly')`, [salaryTx]); } catch (e) { err = e.message; }
   ok(err && /not found/.test(err), 'make_recurring cannot reach another user\'s entry');
+  err = null; try { await q(`select set_default_account($1)`, [cashId]); } catch (e) { err = e.message; }
+  ok(err && /not found/.test(err), 'set_default_account cannot reach another user\'s account');
 });
 const ran = (await q(`select run_due_recurring($1::date) n`, [due])).rows[0].n;
 const recurTransfer = (await q(`select to_account_id from transactions where source='recurring' and type='transfer'`)).rows;

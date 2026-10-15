@@ -1,10 +1,10 @@
+import { AccountForm, ArchiveAccountButton, MakeDefaultButton } from '@/components/account-form';
 import { BackHeader } from '@/components/back-header';
 import { groupAccounts } from '@/lib/accounts';
 import { formatBalance } from '@/lib/format';
 import { THAI_BANKS } from '@/lib/slip/qr';
 import { requireUser } from '@/lib/supabase/server';
 import type { AccountBalance } from '@/lib/types';
-import { AccountForm, ArchiveAccountButton } from './account-form';
 
 export default async function AccountsPage() {
   const { supabase } = await requireUser();
@@ -14,6 +14,7 @@ export default async function AccountsPage() {
   return (
     <div className="grid gap-6">
       <BackHeader href="/settings" title="Accounts" />
+      <p className="text-sm text-ink-soft">New entries start on your default account.</p>
       {groupAccounts(accounts).map((g) => (
         <section key={g.type} className="grid gap-2">
           <h2 className="font-bold">{g.label}</h2>
@@ -26,16 +27,19 @@ export default async function AccountsPage() {
                       <span className="block truncate">
                         {a.name}
                         {a.archived && <span className="ml-2 text-xs">(hidden)</span>}
+                        {a.is_default && <span className="ml-2 text-xs font-semibold text-accent">Default</span>}
                       </span>
                       {a.bank_code && <span className="block text-sm text-ink-soft">{THAI_BANKS[a.bank_code]}</span>}
                     </span>
                     <span className="num text-sm">{formatBalance(Number(a.balance), a.type)}</span>
                   </summary>
-                  <div className="pb-3">
+                  <div className="grid gap-3 pb-3">
                     <AccountForm account={{ ...a, balance: Number(a.balance) }} />
+                    {!a.is_default && !a.archived && <MakeDefaultButton id={a.id} />}
                   </div>
                 </details>
-                <ArchiveAccountButton id={a.id} archived={a.archived} />
+                {/* The default account stays visible; make another one the default first. */}
+                {!a.is_default && <ArchiveAccountButton id={a.id} archived={a.archived} />}
               </li>
             ))}
           </ul>

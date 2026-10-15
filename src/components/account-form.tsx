@@ -1,12 +1,13 @@
 'use client';
 
 import { useActionState, useState, useTransition } from 'react';
-import { saveAccount, setAccountArchived } from '@/app/actions';
+import { saveAccount, setAccountArchived, setDefaultAccount } from '@/app/actions';
 import { ACCOUNT_TYPE_LABELS } from '@/lib/accounts';
 import { THAI_BANKS } from '@/lib/slip/qr';
 import type { AccountBalance, AccountType } from '@/lib/types';
 
-export function AccountForm({ account }: { account?: AccountBalance }) {
+/** Add or edit an account. In onboarding, saving the first account moves on to the next step. */
+export function AccountForm({ account, onboarding }: { account?: AccountBalance; onboarding?: boolean }) {
   const [state, action, pending] = useActionState(saveAccount, undefined);
   const [type, setType] = useState<AccountType>(account?.type ?? 'bank');
   // Cards are shown and entered as the amount owed (a positive number).
@@ -15,6 +16,7 @@ export function AccountForm({ account }: { account?: AccountBalance }) {
   return (
     <form action={action} className="grid gap-3">
       {account && <input type="hidden" name="id" value={account.id} />}
+      {onboarding && <input type="hidden" name="onboarding_step" value="account" />}
       {account && <input type="hidden" name="balance_was" value={shown} />}
       <label className="grid gap-1.5">
         <span className="text-sm font-semibold">Name</span>
@@ -51,7 +53,7 @@ export function AccountForm({ account }: { account?: AccountBalance }) {
       </label>
       {state?.error && <p className="text-sm font-semibold text-expense" role="alert">{state.error}</p>}
       <button className="btn btn-primary justify-self-start" disabled={pending}>
-        {account ? 'Save' : 'Add account'}
+        {onboarding ? 'Continue' : account ? 'Save' : 'Add account'}
       </button>
     </form>
   );
@@ -62,6 +64,15 @@ export function ArchiveAccountButton({ id, archived }: { id: string; archived: b
   return (
     <button className="btn text-sm text-ink-soft" disabled={pending} onClick={() => start(() => setAccountArchived(id, !archived))}>
       {archived ? 'Show' : 'Hide'}
+    </button>
+  );
+}
+
+export function MakeDefaultButton({ id }: { id: string }) {
+  const [pending, start] = useTransition();
+  return (
+    <button className="btn btn-quiet justify-self-start" disabled={pending} onClick={() => start(() => setDefaultAccount(id))}>
+      Make default
     </button>
   );
 }

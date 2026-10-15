@@ -23,14 +23,15 @@ type Fields = {
   note: string;
 };
 
-function fieldsFrom(tx?: Partial<Transaction>, newType: TxnType = 'expense'): Fields {
+/** Form fields for an entry; a new entry or a draft without an account starts on the default account. */
+function fieldsFrom(tx: Partial<Transaction> | undefined, defaultAccount: string, newType: TxnType = 'expense'): Fields {
   return {
     type: tx ? (tx.type ?? '') : newType,
     amount: tx?.amount != null ? String(tx.amount) : '',
     date: tx?.date ?? todayISO(),
     merchant: tx?.merchant ?? '',
     category_id: tx?.category_id ?? '',
-    account_id: tx?.account_id ?? '',
+    account_id: tx?.account_id ?? defaultAccount,
     to_account_id: tx?.to_account_id ?? '',
     note: tx?.note ?? '',
   };
@@ -56,7 +57,8 @@ export function TransactionEditor({
   accounts: Account[];
   slipUrl?: string | null;
 }) {
-  const [fields, setFields] = useState<Fields>(() => fieldsFrom(tx, newType));
+  const defaultAccount = accounts.find((a) => a.is_default && !a.archived)?.id ?? '';
+  const [fields, setFields] = useState<Fields>(() => fieldsFrom(tx, defaultAccount, newType));
   const touched = useRef(new Set<keyof Fields>());
   const [status, setStatus] = useState(tx?.status ?? 'confirmed');
   const [extraction, setExtraction] = useState<Extraction | null>(tx?.extraction ?? null);
@@ -78,7 +80,7 @@ export function TransactionEditor({
     if (!suggestion) return f;
     const next = { ...f };
     for (const k of ['merchant', 'category_id', 'account_id'] as const) {
-      if (!touched.current.has(k)) next[k] = suggestion[k] ?? '';
+      if (!touched.current.has(k)) next[k] = suggestion[k] ?? (k === 'account_id' ? defaultAccount : '');
     }
     return next;
   }
@@ -91,7 +93,7 @@ export function TransactionEditor({
       const { transaction } = (await res.json()) as { transaction?: Transaction };
       if (!res.ok || !transaction) throw new Error('extract failed');
       // Fill fields in place, but never overwrite something the user already typed.
-      const next = fieldsFrom(transaction);
+      const next = fieldsFrom(transaction, defaultAccount);
       setFields((f) => {
         const merged = { ...f };
         (Object.keys(next) as (keyof Fields)[]).forEach((k) => {
@@ -275,14 +277,8 @@ export function TransactionEditor({
           </label>
           <label className="grid gap-1.5">
             <span className="text-sm font-semibold">{isTransfer ? 'From account' : 'Account'}</span>
-            <select
-              name="account_id"
-              value={fields.account_id}
-              onChange={(e) => set('account_id', e.target.value)}
-              className="field"
-              required={isTransfer}
-            >
-              <option value="">{isTransfer ? 'Choose' : 'None'}</option>
+            <select name="account_id" value={fields.account_id} onChange={(e) => set('account_id', e.target.value)} className="field" required>
+              <option value="">Choose</option>
               <AccountOptions accounts={accounts} selected={fields.account_id} />
             </select>
           </label>

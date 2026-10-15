@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { ChevronRight, Repeat, Shapes, Wallet } from 'lucide-react';
 import { signOut } from '@/app/actions';
+import { ProfileForm } from '@/components/profile-form';
 import { YukiArt } from '@/components/yuki';
+import { getProfile } from '@/lib/profile';
 import { requireUser } from '@/lib/supabase/server';
 import { ThemePicker } from './theme-picker';
 
@@ -15,7 +17,7 @@ const LINKS = [
 const ABOUT_YUKI = 'Yuki is a Scottish longhair who takes paperwork very seriously.';
 
 export default async function SettingsPage() {
-  const { user } = await requireUser();
+  const [{ user }, profile] = await Promise.all([requireUser(), getProfile()]);
   return (
     <div className="grid gap-6">
       <h1 className="font-display text-2xl font-extrabold">Settings</h1>
@@ -29,6 +31,14 @@ export default async function SettingsPage() {
           </Link>
         ))}
       </nav>
+
+      <section className="grid gap-2">
+        <h2 className="font-bold">You</h2>
+        <div className="card p-4">
+          <ProfileForm profile={profile} />
+        </div>
+        <p className="text-sm text-ink-soft">Yuki uses your name now and then. Leave the budget empty to hide it.</p>
+      </section>
 
       <section className="grid gap-2">
         <h2 className="font-bold">Theme</h2>

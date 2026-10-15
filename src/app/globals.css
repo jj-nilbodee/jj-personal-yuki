@@ -99,6 +99,8 @@
 
 @utility field {
   width: 100%;
+  /* Date inputs have a wide intrinsic size; let them shrink to their grid column. */
+  min-width: 0;
   min-height: 44px;
   padding: 0.625rem 0.875rem;
   background: var(--surface);

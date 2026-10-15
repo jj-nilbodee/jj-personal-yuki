@@ -1,10 +1,11 @@
 import Link from 'next/link';
-import { ArrowDownLeft, Plus, Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { AccountOptions } from '@/components/account-options';
 import { AddButton } from '@/components/add-sheet';
+import { EmptyLedger } from '@/components/empty-ledger';
 import { TransactionRow } from '@/components/transaction-row';
-import { YukiArt } from '@/components/yuki';
 import { formatDay, formatMoney } from '@/lib/format';
+import { getProfile } from '@/lib/profile';
 import { requireUser } from '@/lib/supabase/server';
 import type { Account, Category, Transaction, TxnType } from '@/lib/types';
 
@@ -50,10 +51,12 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   if (f.to) query = query.lte('date', f.to);
   if (f.status === 'review') query = query.neq('status', 'confirmed');
 
-  const [{ data: txData }, { data: catData }, { data: accData }] = await Promise.all([
+  const [{ data: txData }, { data: catData }, { data: accData }, profile, { data: incomeRules }] = await Promise.all([
     query,
     supabase.from('categories').select('*').order('name'),
     supabase.from('accounts').select('*').order('name'),
+    getProfile(),
+    supabase.from('recurring_rules').select('id').eq('type', 'income').eq('active', true).limit(1),
   ]);
   const transactions = (txData ?? []) as Transaction[];
   const categoryList = (catData ?? []) as Category[];
@@ -117,17 +120,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
         filtered ? (
           <p className="text-ink-soft">No entries match these filters. Clear them to see everything.</p>
         ) : (
-          <section className="card flex flex-col items-center gap-4 p-8 text-center">
-            <YukiArt pose="asleep" size={120} />
-            <p>Nothing logged yet. Yuki&apos;s napping until you add one.</p>
-            <p className="text-sm text-ink-soft">Start with your income so the balance shows what&apos;s left to spend.</p>
-            <Link href="/transactions/new?type=income" className="btn btn-primary">
-              <ArrowDownLeft className="size-5" aria-hidden /> Add your income
-            </Link>
-            <AddButton className="btn btn-quiet">
-              <Plus className="size-5" aria-hidden /> Add an expense
-            </AddButton>
-          </section>
+          <EmptyLedger name={profile?.display_name ?? null} salaryScheduled={(incomeRules ?? []).length > 0} />
         )
       ) : (
         [...byDay].map(([day, rows]) => {
