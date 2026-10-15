@@ -76,6 +76,9 @@ await as(A, async () => {
   ok(up.length > 0, 'upcoming_recurring returns rows');
 });
 
+// upcoming_recurring() looks ahead from the real Bangkok date, so the transfer rule is due a few days from now.
+const due = (await q(`select ((now() at time zone 'Asia/Bangkok')::date + 3)::text d`)).rows[0].d;
+
 // Transfers, balances and type-less slip drafts.
 await as(A, async () => {
   const cash = (await q(`select id from accounts where name='Cash'`)).rows[0].id;
@@ -113,7 +116,7 @@ await as(A, async () => {
   for (let i = 0; i < 5; i++) await q(`insert into transactions (type, amount, account_id, to_account_id) values ('transfer', 1, $1, $2)`, [bank, cash]);
   ok((await uncategorized()) === before, 'transfers are not counted as uncategorized');
 
-  await q(`insert into recurring_rules (type, amount, account_id, to_account_id, anchor_day, next_run_date) values ('transfer', 2000, $1, $2, 5, '2026-10-05')`, [bank, cash]);
+  await q(`insert into recurring_rules (type, amount, account_id, to_account_id, anchor_day, next_run_date) values ('transfer', 2000, $1, $2, extract(day from $3::date)::int, $3::date)`, [bank, cash, due]);
   ok(await fails(`insert into recurring_rules (type, amount, account_id, anchor_day, next_run_date) values ('transfer', 1, $1, 5, '2026-10-05')`, [bank]), 'recurring transfer needs both accounts');
   const up = (await q(`select type::text, to_account_id from upcoming_recurring(10) where type = 'transfer'`)).rows;
   ok(up.length === 1 && up[0].to_account_id === cash, 'upcoming_recurring includes transfers with destination');
@@ -136,7 +139,7 @@ await as(B, async () => {
   let err = null; try { await q(`select make_recurring($1, 'monthly')`, [salaryTx]); } catch (e) { err = e.message; }
   ok(err && /not found/.test(err), 'make_recurring cannot reach another user\'s entry');
 });
-const ran = (await q(`select run_due_recurring('2026-10-05') n`)).rows[0].n;
+const ran = (await q(`select run_due_recurring($1::date) n`, [due])).rows[0].n;
 const recurTransfer = (await q(`select to_account_id from transactions where source='recurring' and type='transfer'`)).rows;
 ok(ran >= 1 && recurTransfer.length === 1 && recurTransfer[0].to_account_id, 'cron creates recurring transfers');
 
