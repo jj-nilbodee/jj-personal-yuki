@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from 'react';
 import { saveAccount, setAccountArchived, setDefaultAccount } from '@/app/actions';
+import { AmountInput } from '@/components/amount-input';
 import { ACCOUNT_TYPE_LABELS } from '@/lib/accounts';
 import { THAI_BANKS } from '@/lib/slip/qr';
 import type { AccountBalance, AccountType } from '@/lib/types';
@@ -49,7 +50,8 @@ export function AccountForm({ account, onboarding }: { account?: AccountBalance;
       </div>
       <label className="grid gap-1.5">
         <span className="text-sm font-semibold">{type === 'card' ? 'Amount owed now (฿)' : 'Balance now (฿)'}</span>
-        <input name="balance" inputMode="decimal" defaultValue={shown} placeholder="0.00" className="field num" autoComplete="off" />
+        {/* A bank or wallet can be overdrawn; a card is entered as the (positive) amount owed. */}
+        <AmountInput name="balance" defaultValue={shown} allowNegative={type !== 'card'} placeholder="0.00" className="field num" />
       </label>
       {state?.error && <p className="text-sm font-semibold text-expense" role="alert">{state.error}</p>}
       <button className="btn btn-primary justify-self-start" disabled={pending}>

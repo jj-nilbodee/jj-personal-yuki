@@ -9,6 +9,7 @@ import { REPEATS, repeatLabel } from '@/lib/recurring';
 import { THAI_BANKS } from '@/lib/slip/qr';
 import type { Account, Category, Extraction, Transaction, TxnType } from '@/lib/types';
 import { AccountOptions } from './account-options';
+import { AmountInput } from './amount-input';
 import { CategoryIcon } from './category-icon';
 import { PawProgress } from './yuki';
 
@@ -227,14 +228,12 @@ export function TransactionEditor({
           <span className="text-sm font-semibold">Amount</span>
           <div className="relative">
             <span className="num pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-2xl text-ink-soft">฿</span>
-            <input
+            <AmountInput
               ref={amountRef}
               name="amount"
-              inputMode="decimal"
-              autoComplete="off"
               required
               value={fields.amount}
-              onChange={(e) => set('amount', e.target.value)}
+              onValueChange={(v) => set('amount', v)}
               placeholder="0.00"
               className="field num h-16 pl-10 text-3xl"
               autoFocus={!tx}

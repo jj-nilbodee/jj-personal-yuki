@@ -3,6 +3,7 @@
 import { useActionState, useState, useTransition } from 'react';
 import { deleteRecurring, saveRecurring } from '@/app/actions';
 import { AccountOptions } from '@/components/account-options';
+import { AmountInput } from '@/components/amount-input';
 import { todayISO } from '@/lib/format';
 import { REPEAT_LABEL, REPEATS, repeatOf } from '@/lib/recurring';
 import type { Account, Category, RecurringRule, TxnType } from '@/lib/types';
@@ -38,7 +39,7 @@ export function RuleForm({
         </label>
         <label className="grid gap-1.5">
           <span className="text-sm font-semibold">Amount (฿)</span>
-          <input name="amount" inputMode="decimal" required defaultValue={rule?.amount} className="field num" />
+          <AmountInput name="amount" required defaultValue={rule?.amount} className="field num" />
         </label>
       </div>
       {type !== 'transfer' && (

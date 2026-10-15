@@ -14,9 +14,12 @@ const str = (f: FormData, k: string) => {
   return typeof v === 'string' && v.trim() !== '' ? v.trim() : null;
 };
 
+/** A number as typed into a form ("45,000.50", "฿ 1 200"); NaN if it isn't one. */
+const parseNumber = (raw: string) => Number(raw.replace(/[,\s฿]/g, ''));
+
 function parseAmount(raw: string | null): number | null {
   if (!raw) return null;
-  const n = Number(raw.replace(/[,\s฿]/g, ''));
+  const n = parseNumber(raw);
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
 }
 
@@ -136,10 +139,12 @@ export async function saveAccount(_prev: ActionResult, form: FormData): Promise<
   const type = (str(form, 'type') ?? 'bank') as AccountType;
   // The edit form pre-fills the balance; only apply it if the user changed it,
   // so renaming an account never resets a balance that moved since page load.
+  // Compared as numbers: the field shows "12,000" for a pre-filled 12000.
   const rawBalance = str(form, 'balance');
-  const changed = rawBalance !== str(form, 'balance_was');
-  const balance = rawBalance === null || !changed ? null : Number(rawBalance.replace(/[,\s฿]/g, ''));
+  const was = str(form, 'balance_was');
+  const balance = rawBalance === null ? null : parseNumber(rawBalance);
   if (balance !== null && !Number.isFinite(balance)) return { error: 'Enter the balance as a number.' };
+  const changed = balance !== (was === null ? null : parseNumber(was));
 
   const id = str(form, 'id');
   // Only banks issue bank accounts and cards; a bank code elsewhere would mislead slip matching.
@@ -149,7 +154,7 @@ export async function saveAccount(_prev: ActionResult, form: FormData): Promise<
     : await supabase.from('accounts').insert(row).select('id').single();
   if (error) return { error: error.message };
 
-  if (balance !== null) {
+  if (balance !== null && changed) {
     // Cards are entered as the amount owed and stored as a negative balance.
     const current = type === 'card' ? -Math.abs(balance) : balance;
     const { error: balError } = await supabase.rpc('set_account_balance', { p_account: data.id, p_balance: current });

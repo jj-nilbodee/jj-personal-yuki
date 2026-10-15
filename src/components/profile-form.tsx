@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { saveProfile } from '@/app/actions';
 import type { Profile } from '@/lib/types';
+import { AmountInput } from './amount-input';
 
 /**
  * What Yuki calls the user and their monthly budget. Onboarding asks for one at
@@ -38,13 +39,11 @@ export function ProfileForm({
       {step !== 'name' && (
         <label className="grid gap-1.5">
           <span className="text-sm font-semibold">Monthly spending budget (฿)</span>
-          <input
+          <AmountInput
             name="monthly_budget"
-            inputMode="decimal"
-            defaultValue={profile?.monthly_budget ?? ''}
+            defaultValue={profile?.monthly_budget}
             required={step === 'budget'}
             placeholder="0.00"
-            autoComplete="off"
             className="field num"
           />
         </label>

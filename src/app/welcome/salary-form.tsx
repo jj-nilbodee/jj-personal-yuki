@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react';
 import { saveSalary } from '@/app/actions';
 import { AccountOptions } from '@/components/account-options';
+import { AmountInput } from '@/components/amount-input';
 import { endOfMonth, todayISO } from '@/lib/format';
 import { MONTH_END_ANCHOR, ordinal } from '@/lib/recurring';
 import type { Account } from '@/lib/types';
@@ -23,7 +24,7 @@ export function SalaryForm({ accounts, categoryId }: { accounts: Account[]; cate
       {categoryId && <input type="hidden" name="category_id" value={categoryId} />}
       <label className="grid gap-1.5">
         <span className="text-sm font-semibold">Amount (฿)</span>
-        <input name="amount" inputMode="decimal" required placeholder="0.00" autoComplete="off" className="field num" />
+        <AmountInput name="amount" required placeholder="0.00" className="field num" />
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="grid gap-1.5">
