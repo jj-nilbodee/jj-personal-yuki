@@ -289,6 +289,46 @@ export async function saveSalary(_prev: ActionResult, form: FormData): Promise<A
 }
 
 // ---------------------------------------------------------------------------
+// Erase
+// ---------------------------------------------------------------------------
+
+// Storage's list and remove calls handle at most this many objects per request.
+const STORAGE_PAGE = 1000;
+
+/**
+ * "Delete all my data": removes every slip photo under the user's folder, then
+ * erase_my_data() deletes their rows and re-seeds a fresh start (onboarding
+ * again). Photos go first so a failure there leaves the data intact.
+ */
+export async function eraseMyData(_prev: ActionResult): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+  const slips = supabase.storage.from('slips');
+
+  // Slips live at {user_id}/{year}/{tx_id}.ext. Listing the folder (rather than
+  // reading slip_path) also catches photos left behind by an interrupted upload.
+  const paths: string[] = [];
+  const { data: years, error: listError } = await slips.list(user.id, { limit: STORAGE_PAGE });
+  if (listError) return { error: `Couldn't read your slip photos (${listError.message}). Nothing was deleted.` };
+  for (const year of years ?? []) {
+    for (let offset = 0; ; offset += STORAGE_PAGE) {
+      const { data: files, error } = await slips.list(`${user.id}/${year.name}`, { limit: STORAGE_PAGE, offset });
+      if (error) return { error: `Couldn't read your slip photos (${error.message}). Nothing was deleted.` };
+      paths.push(...(files ?? []).map((f) => `${user.id}/${year.name}/${f.name}`));
+      if (!files || files.length < STORAGE_PAGE) break;
+    }
+  }
+  for (let i = 0; i < paths.length; i += STORAGE_PAGE) {
+    const { error } = await slips.remove(paths.slice(i, i + STORAGE_PAGE));
+    if (error) return { error: `Couldn't delete your slip photos (${error.message}). Your entries are still here; try again.` };
+  }
+
+  const { error } = await supabase.rpc('erase_my_data');
+  if (error) return { error: error.message };
+  refresh();
+  redirect('/welcome');
+}
+
+// ---------------------------------------------------------------------------
 // Session
 // ---------------------------------------------------------------------------
 

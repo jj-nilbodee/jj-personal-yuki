@@ -220,5 +220,28 @@ const ran = (await q(`select run_due_recurring($1::date) n`, [due])).rows[0].n;
 const recurTransfer = (await q(`select to_account_id from transactions where source='recurring' and type='transfer'`)).rows;
 ok(ran >= 1 && recurTransfer.length === 1 && recurTransfer[0].to_account_id, 'cron creates recurring transfers');
 
+// "Delete all my data": A starts over; B's data is untouched.
+await as(B, async () => {
+  const bAcc = (await q(`insert into accounts (name, type) values ('B wallet', 'e_wallet') returning id`)).rows[0].id;
+  await q(`insert into transactions (amount, account_id) values (77, $1)`, [bAcc]);
+});
+const counts = async (uid) => (await q(`select
+  (select count(*)::int from transactions where user_id=$1) tx, (select count(*)::int from recurring_rules where user_id=$1) rules,
+  (select count(*)::int from accounts where user_id=$1) accounts, (select count(*)::int from categories where user_id=$1) categories,
+  (select onboarding_step from profiles where user_id=$1) step, (select monthly_budget from profiles where user_id=$1) budget`, [uid])).rows[0];
+const bBefore = await counts(B);
+await as(A, async () => {
+  let err = null; try { await q(`select seed_user_defaults($1)`, [A]); } catch (e) { err = e.message; }
+  ok(err && /permission denied/.test(err), 'seed_user_defaults is not callable directly');
+  await q(`select erase_my_data()`);
+});
+const aAfter = await counts(A);
+ok(aAfter.tx === 0 && aAfter.rules === 0 && aAfter.accounts === 0, 'erase_my_data removes entries, rules and accounts');
+ok(aAfter.categories === 14 && aAfter.step === 'name' && aAfter.budget === null, 'erase_my_data restores default categories and restarts onboarding');
+ok(JSON.stringify(await counts(B)) === JSON.stringify(bBefore), 'erase_my_data leaves other users alone');
+let eraseErr = null; try { await q(`select erase_my_data()`); } catch (e) { eraseErr = e.message; }
+ok(eraseErr && /not signed in/.test(eraseErr), 'erase_my_data needs a signed-in caller');
+
 await q(`delete from auth.users where id=$1`, [A]);
-ok((await q(`select count(*)::int n from transactions where user_id=$1`, [A])).rows[0].n === 0, 'deleting a user removes their rows');
+// A was just re-seeded by erase_my_data, so these rows exist until the user is deleted.
+ok((await q(`select (select count(*)::int from categories where user_id=$1) + (select count(*)::int from profiles where user_id=$1) n`, [A])).rows[0].n === 0, 'deleting a user removes their rows');

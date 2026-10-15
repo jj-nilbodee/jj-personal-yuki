@@ -5,6 +5,7 @@ import { ProfileForm } from '@/components/profile-form';
 import { YukiArt } from '@/components/yuki';
 import { getProfile } from '@/lib/profile';
 import { requireUser } from '@/lib/supabase/server';
+import { EraseData } from './erase-data';
 import { ThemePicker } from './theme-picker';
 
 const LINKS = [
@@ -51,6 +52,14 @@ export default async function SettingsPage() {
         <form action={signOut}>
           <button className="btn btn-quiet">Sign out</button>
         </form>
+      </section>
+
+      <section className="grid gap-2">
+        <h2 className="font-bold">Your data</h2>
+        <div className="card grid gap-3 p-4">
+          <p className="text-sm text-ink-soft">Erase everything you&apos;ve logged and start over. You stay signed in.</p>
+          <EraseData />
+        </div>
       </section>
 
       <section className="card flex items-center gap-4 p-4">
