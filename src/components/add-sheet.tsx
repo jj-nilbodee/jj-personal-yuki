@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Camera, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Camera, Repeat, X } from 'lucide-react';
 import { prepareSlip } from '@/lib/slip/prepare';
 import { formatDay, formatMoney } from '@/lib/format';
 import { PawProgress } from './yuki';
@@ -91,6 +91,9 @@ export function AddSheetProvider({ children }: { children: React.ReactNode }) {
                     <ArrowDownLeft className="size-5 text-income" aria-hidden /> Income
                   </Link>
                 </div>
+                <Link href="/settings/recurring/new" onClick={close} className="btn btn-quiet h-14">
+                  <Repeat className="size-5" aria-hidden /> Recurring
+                </Link>
               </div>
             )}
 
