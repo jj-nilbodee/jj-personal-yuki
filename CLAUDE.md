@@ -17,6 +17,15 @@ npx vitest run src/lib/slip/qr.test.ts   # single test file
 npm run test:db      # applies supabase/migrations to in-memory Postgres (PGlite) and checks RLS + SQL functions
 ```
 
+## Commits
+
+Commit atomically, as a habit, without waiting to be asked:
+
+- One logical change per commit (a feature, a fix, a refactor, a docs or config change). If the work mixes concerns, split it into separate commits; a migration goes in the same commit as the code that needs it.
+- Commit as soon as a change is verified (build, lint, tests, and `npm run test:db` for migrations), so each commit stands on its own and unrelated work never piles up in the tree.
+- Conventional subjects as in the history (`feat:`, `fix:`, `chore:`, `test(db):`, `docs:`); the subject says what changed, the body says why.
+- Committing is not pushing: pushing `main` deploys to Vercel, and new migrations must reach Supabase (`supabase db push`) before the code that uses them.
+
 ## Architecture
 
 **Stack:** Next.js 16 App Router (`src/proxy.ts` is the v16 name for middleware) · Supabase Postgres/Auth/Storage via `@supabase/ssr` · Gemini Flash via `@google/genai` · Tailwind v4 · Vercel (hosting + cron). Functions are pinned to `sin1` in `vercel.json` to sit next to the Supabase project (`ap-southeast-1`); keep the two in the same region, since every page makes several sequential Supabase calls.
