@@ -62,6 +62,10 @@ export interface Transaction {
   date: string; // YYYY-MM-DD, Bangkok local date
   merchant: string | null;
   note: string | null;
+  /** Income that pays for the following month; monthly totals count it there. */
+  for_next_month: boolean;
+  /** First day of the month this entry counts toward (generated from date + for_next_month). */
+  ledger_month: string;
   status: TxnStatus;
   source: TxnSource;
   slip_path: string | null;
@@ -80,6 +84,7 @@ export interface RecurringRule {
   category_id: string | null;
   merchant: string | null;
   note: string | null;
+  for_next_month: boolean;
   frequency: Frequency;
   anchor_day: number;
   next_run_date: string;

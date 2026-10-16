@@ -4,7 +4,7 @@ import { AccountOptions } from '@/components/account-options';
 import { AddButton } from '@/components/add-sheet';
 import { EmptyLedger } from '@/components/empty-ledger';
 import { TransactionRow } from '@/components/transaction-row';
-import { formatDay, formatMoney } from '@/lib/format';
+import { formatDay, formatMoney, formatMonth } from '@/lib/format';
 import { getProfile } from '@/lib/profile';
 import { requireUser } from '@/lib/supabase/server';
 import type { Account, Category, Transaction, TxnType } from '@/lib/types';
@@ -16,7 +16,9 @@ const TYPE_FILTERS: { type: TxnType; label: string }[] = [
   { type: 'transfer', label: 'Transfers' },
 ];
 
-type Filters = { q?: string; type?: string; category?: string; account?: string; from?: string; to?: string; status?: string };
+// `month` (YYYY-MM) is the month entries count toward, which differs from the date for income
+// that covers the following month. The dashboard's income/spent tiles link with it.
+type Filters = { q?: string; type?: string; category?: string; account?: string; from?: string; to?: string; month?: string; status?: string };
 
 export default async function TransactionsPage({ searchParams }: { searchParams: Promise<Filters> }) {
   const { supabase } = await requireUser();
@@ -49,6 +51,8 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   }
   if (f.from) query = query.gte('date', f.from);
   if (f.to) query = query.lte('date', f.to);
+  const month = f.month && /^\d{4}-\d{2}$/.test(f.month) ? f.month : null;
+  if (month) query = query.eq('ledger_month', `${month}-01`);
   if (f.status === 'review') query = query.neq('status', 'confirmed');
 
   const [{ data: txData }, { data: catData }, { data: accData }, profile, { data: incomeRules }] = await Promise.all([
@@ -106,6 +110,8 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           <input name="to" type="date" defaultValue={f.to} className="field" aria-label="To date" />
         </div>
         {f.status && <input type="hidden" name="status" value={f.status} />}
+        {month && <input type="hidden" name="month" value={month} />}
+        {month && <p className="text-sm text-ink-soft">Counted in {formatMonth(`${month}-01`)}</p>}
         <div className="flex gap-2">
           <button className="btn btn-quiet">Apply</button>
           {filtered && (

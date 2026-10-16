@@ -4,6 +4,7 @@ import { useActionState, useState, useTransition } from 'react';
 import { deleteRecurring, saveRecurring } from '@/app/actions';
 import { AccountOptions } from '@/components/account-options';
 import { AmountInput } from '@/components/amount-input';
+import { NextMonthToggle } from '@/components/next-month-toggle';
 import { todayISO } from '@/lib/format';
 import { REPEAT_LABEL, REPEATS, repeatOf } from '@/lib/recurring';
 import type { Account, Category, RecurringRule, TxnType } from '@/lib/types';
@@ -48,6 +49,7 @@ export function RuleForm({
           <input name="merchant" defaultValue={rule?.merchant ?? ''} className="field" placeholder="e.g. Rent, Netflix" />
         </label>
       )}
+      {type === 'income' && <NextMonthToggle defaultChecked={rule?.for_next_month} />}
       <div className="grid grid-cols-2 gap-3">
         <label className="grid gap-1.5">
           <span className="text-sm font-semibold">Repeats</span>

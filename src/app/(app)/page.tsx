@@ -6,7 +6,7 @@ import { EmptyLedger } from '@/components/empty-ledger';
 import { TransactionRow, UpcomingRow } from '@/components/transaction-row';
 import { YukiArt } from '@/components/yuki';
 import { groupAccounts, transferLabel } from '@/lib/accounts';
-import { daysUntil, endOfMonth, formatBalance, formatMoney, formatMonth, todayISO } from '@/lib/format';
+import { daysUntil, formatBalance, formatMoney, formatMonth, todayISO } from '@/lib/format';
 import { getProfile } from '@/lib/profile';
 import { requireUser } from '@/lib/supabase/server';
 import type { AccountBalance, Category, CategoryTotal, MonthSummary, Transaction, UpcomingRecurring } from '@/lib/types';
@@ -99,7 +99,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const salaryScheduled = (incomeRuleRes.data ?? []).length > 0;
   // The balance only means something once income is in, so ask for it before anything else.
   const askForIncome = isCurrent && income === 0 && !nothingYet && !salaryScheduled;
-  const monthRange = `from=${month}-01&to=${endOfMonth(`${month}-01`)}`;
 
   const upcomingSection = upcoming.length > 0 && (
     <section>
@@ -159,13 +158,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           {formatMoney(Math.abs(balance))}
         </p>
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <Link href={`/transactions?type=income&${monthRange}`} className="rounded-2xl bg-bg p-3">
+          <Link href={`/transactions?type=income&month=${month}`} className="rounded-2xl bg-bg p-3">
             <p className="flex items-center gap-1 text-sm text-ink-soft">
               <ArrowDownLeft className="size-4 text-income" aria-hidden /> Income
             </p>
             <p className="num mt-1 font-semibold text-income">{formatMoney(income)}</p>
           </Link>
-          <Link href={`/transactions?type=expense&${monthRange}`} className="rounded-2xl bg-bg p-3">
+          <Link href={`/transactions?type=expense&month=${month}`} className="rounded-2xl bg-bg p-3">
             <p className="flex items-center gap-1 text-sm text-ink-soft">
               <ArrowUpRight className="size-4 text-expense" aria-hidden /> Spent
             </p>

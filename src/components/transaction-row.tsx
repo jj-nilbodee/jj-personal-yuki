@@ -8,7 +8,7 @@ import { PawProgress } from './yuki';
 
 type Row = Pick<
   Transaction,
-  'id' | 'type' | 'amount' | 'merchant' | 'note' | 'status' | 'date' | 'slip_path' | 'account_id' | 'to_account_id'
+  'id' | 'type' | 'amount' | 'merchant' | 'note' | 'status' | 'date' | 'slip_path' | 'account_id' | 'to_account_id' | 'for_next_month' | 'ledger_month'
 >;
 
 // Direction arrow pairs with colour so income vs expense never relies on colour alone.
@@ -48,7 +48,13 @@ export function TransactionRow({
           ) : tx.status === 'needs_review' ? (
             <span className="font-semibold text-accent">Check this one</span>
           ) : (
-            [showDate && formatDay(tx.date), isTransfer ? 'Transfer' : (category?.name ?? 'No category'), tx.slip_path && 'Slip']
+            [
+              showDate && formatDay(tx.date),
+              isTransfer ? 'Transfer' : (category?.name ?? 'No category'),
+              // Paid at month-end for the month after: say which month it counts in.
+              tx.for_next_month && `For ${new Date(`${tx.ledger_month}T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' })}`,
+              tx.slip_path && 'Slip',
+            ]
               .filter(Boolean)
               .join(' · ')
           )}

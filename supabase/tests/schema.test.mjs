@@ -161,9 +161,9 @@ await as(A, async () => {
   await q(`select set_default_account($1)`, [cash]);
 
   // Salary from onboarding, with "today" pinned to 20 Oct 2026.
-  const startSalary = async (day, paid) => {
-    const r = (await q(`select r.id, r.next_run_date::text as next from start_salary(30000, $1, $2, $3, $4, '2026-10-20') r`, [day, bank, aSalary, paid])).rows[0];
-    const logged = (await q(`select date::text d, type::text, account_id, category_id from transactions where recurring_rule_id=$1`, [r.id])).rows;
+  const startSalary = async (day, paid, nextMonth = false) => {
+    const r = (await q(`select r.id, r.next_run_date::text as next from start_salary(30000, $1, $2, $3, $4, $5, '2026-10-20') r`, [day, bank, aSalary, paid, nextMonth])).rows[0];
+    const logged = (await q(`select date::text d, ledger_month::text m, type::text, account_id, category_id from transactions where recurring_rule_id=$1 order by date`, [r.id])).rows;
     return { ...r, logged };
   };
   let sal = await startSalary(25, false);
@@ -179,8 +179,28 @@ await as(A, async () => {
   ok(sal.next === '2026-11-20' && sal.logged[0]?.d === '2026-10-20', 'start_salary: paid today');
   sal = await startSalary(20, false);
   ok(sal.next === '2026-10-20' && sal.logged.length === 0, 'start_salary: payday today, not in yet');
-  const monthEnd = (await q(`select next_run_date::text n from start_salary(30000, 31, $1, null, false, '2026-02-10')`, [bank])).rows[0].n;
+  const monthEnd = (await q(`select next_run_date::text n from start_salary(30000, 31, $1, null, false, false, '2026-02-10')`, [bank])).rows[0].n;
   ok(monthEnd === '2026-02-28', 'start_salary: last day of a short month');
+
+  // Salary for the following month (paid at month-end, lived on the month after).
+  sal = await startSalary(31, true, true);
+  ok(sal.next === '2026-10-31' && sal.logged.map((l) => `${l.d}→${l.m}`).join() === '2026-09-30→2026-10-01',
+    'start_salary for next month: logs last month\'s pay, counted in this month');
+  sal = await startSalary(5, true, true);
+  ok(sal.next === '2026-11-05' && sal.logged.map((l) => `${l.d}→${l.m}`).join() === '2026-09-05→2026-10-01,2026-10-05→2026-11-01',
+    'start_salary for next month: payday already passed logs both paydays, each counted in the month after');
+  sal = await startSalary(31, false, true);
+  ok(sal.next === '2026-10-31' && sal.logged.length === 0, 'start_salary for next month: nothing logged unless paid');
+  ok(await fails(`insert into transactions (type, amount, account_id, for_next_month) values ('expense', 5, $1, true)`, [bank]), 'only income can count toward next month');
+
+  // Monthly totals follow ledger_month: 31 Oct pay for November counts in November, not October.
+  await q(`insert into transactions (type, amount, account_id, for_next_month, date) values ('income', 777, $1, true, '2027-03-31')`, [bank]);
+  const inc = async (m) => Number((await q(`select month_summary($1::date) s`, [m])).rows[0].s.income);
+  ok((await inc('2027-03-15')) === 0 && (await inc('2027-04-15')) === 777, 'month_summary counts next-month income in the following month');
+  await q(`delete from transactions where amount = 777`);
+  const nmTx = (await q(`insert into transactions (type, amount, account_id, for_next_month, date) values ('income', 888, $1, true, '2026-09-30') returning id`, [bank])).rows[0].id;
+  const nmRule = (await q(`select r.for_next_month from make_recurring($1, 'monthly', 31, '2026-10-01') r`, [nmTx])).rows[0];
+  ok(nmRule.for_next_month === true, 'make_recurring keeps "counts toward next month"');
   ok(await fails(`select start_salary(30000, 0, $1)`, [bank]), 'start_salary: payday must be a day of the month');
   // Keep the cron run below about the transfer rule only.
   await q(`delete from transactions where recurring_rule_id in (select id from recurring_rules where type = 'income')`);
@@ -219,6 +239,12 @@ await as(B, async () => {
 const ran = (await q(`select run_due_recurring($1::date) n`, [due])).rows[0].n;
 const recurTransfer = (await q(`select to_account_id from transactions where source='recurring' and type='transfer'`)).rows;
 ok(ran >= 1 && recurTransfer.length === 1 && recurTransfer[0].to_account_id, 'cron creates recurring transfers');
+// A next-month salary rule due on 31 Dec creates an entry dated 31 Dec, counted in January.
+await q(`insert into recurring_rules (user_id, type, amount, account_id, for_next_month, anchor_day, next_run_date) values ($1, 'income', 999, $2, true, 31, '2026-12-31')`, [A, cashId]);
+await q(`update recurring_rules set active = false where user_id = $1 and amount <> 999`, [A]);
+await q(`select run_due_recurring('2026-12-31')`);
+const nmCron = (await q(`select date::text d, ledger_month::text m, for_next_month from transactions where amount = 999`)).rows;
+ok(nmCron.length === 1 && nmCron[0].for_next_month && nmCron[0].d === '2026-12-31' && nmCron[0].m === '2027-01-01', 'cron keeps "counts toward next month" on created entries');
 
 // "Delete all my data": A starts over; B's data is untouched.
 await as(B, async () => {

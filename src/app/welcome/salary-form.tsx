@@ -4,7 +4,8 @@ import { useActionState, useState } from 'react';
 import { saveSalary } from '@/app/actions';
 import { AccountOptions } from '@/components/account-options';
 import { AmountInput } from '@/components/amount-input';
-import { endOfMonth, todayISO } from '@/lib/format';
+import { NextMonthToggle } from '@/components/next-month-toggle';
+import { endOfMonth, formatDay, todayISO } from '@/lib/format';
 import { MONTH_END_ANCHOR, ordinal } from '@/lib/recurring';
 import type { Account } from '@/lib/types';
 
@@ -13,10 +14,20 @@ const DAYS = Array.from({ length: 30 }, (_, i) => i + 1);
 export function SalaryForm({ accounts, categoryId }: { accounts: Account[]; categoryId: string | null }) {
   const [state, action, pending] = useActionState(saveSalary, undefined);
   const [payday, setPayday] = useState('');
+  const [forNextMonth, setForNextMonth] = useState(false);
   const today = todayISO();
-  // This month's payday, clamped to the month's length like the rule itself.
-  const paydayThisMonth = Math.min(Number(payday), Number(endOfMonth(today).slice(8)));
-  const alreadyDue = payday !== '' && paydayThisMonth <= Number(today.slice(8));
+  // A month's payday, clamped to its length like the rule itself (31 = last day).
+  const paydayIn = (monthIso: string) => {
+    const end = endOfMonth(monthIso);
+    return `${end.slice(0, 8)}${String(Math.min(Number(payday), Number(end.slice(8)))).padStart(2, '0')}`;
+  };
+  const lastMonth = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 2, 1)).toISOString().slice(0, 10);
+  // What "already paid" logs, matching start_salary(): this month's payday once it has
+  // passed and, for pay that covers the month after, last month's payday too.
+  const loggable =
+    payday === ''
+      ? []
+      : [...(forNextMonth ? [paydayIn(lastMonth)] : []), ...(paydayIn(today) <= today ? [paydayIn(today)] : [])];
 
   return (
     <form action={action} className="grid gap-3">
@@ -52,10 +63,11 @@ export function SalaryForm({ accounts, categoryId }: { accounts: Account[]; cate
           </select>
         </label>
       </div>
-      {alreadyDue && (
+      <NextMonthToggle checked={forNextMonth} onChange={setForNextMonth} />
+      {loggable.length > 0 && (
         <label className="flex min-h-11 items-center gap-3">
-          <input type="checkbox" name="already_paid" className="size-5 accent-accent" />
-          <span>This month&apos;s salary already came in</span>
+          <input type="checkbox" name="already_paid" className="size-5 shrink-0 accent-accent" />
+          <span>Already paid on {loggable.map((d) => formatDay(d)).join(' and ')}</span>
         </label>
       )}
       {state?.error && (

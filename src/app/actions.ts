@@ -28,19 +28,25 @@ const TXN_TYPES: TxnType[] = ['expense', 'income', 'transfer'];
 /**
  * Type plus the fields that depend on it. A transfer moves money between two of
  * the user's own accounts, so it has a destination and never a category or payee.
+ * Only income can count toward the following month.
  */
-function typedFields(form: FormData): { error: string } | { fields: Record<string, string | null> & { type: TxnType } } {
+function typedFields(
+  form: FormData,
+): { error: string } | { fields: Record<string, string | boolean | null> & { type: TxnType } } {
   const type = str(form, 'type') as TxnType | null;
   if (!type || !TXN_TYPES.includes(type)) return { error: 'Choose money out, money in, or a transfer.' };
   const account_id = str(form, 'account_id');
+  const for_next_month = type === 'income' && form.get('for_next_month') === 'on';
   if (type !== 'transfer') {
     if (!account_id) return { error: 'Pick the account this money went through.' };
-    return { fields: { type, account_id, to_account_id: null, category_id: str(form, 'category_id'), merchant: str(form, 'merchant') } };
+    return {
+      fields: { type, account_id, to_account_id: null, category_id: str(form, 'category_id'), merchant: str(form, 'merchant'), for_next_month },
+    };
   }
   const to_account_id = str(form, 'to_account_id');
   if (!account_id || !to_account_id) return { error: 'Pick the account the money left and the one it went to.' };
   if (account_id === to_account_id) return { error: 'Pick two different accounts.' };
-  return { fields: { type, account_id, to_account_id, category_id: null, merchant: null } };
+  return { fields: { type, account_id, to_account_id, category_id: null, merchant: null, for_next_month } };
 }
 
 function refresh() {
@@ -282,6 +288,7 @@ export async function saveSalary(_prev: ActionResult, form: FormData): Promise<A
     p_account: account,
     p_category: str(form, 'category_id'),
     p_already_paid: form.get('already_paid') === 'on',
+    p_for_next_month: form.get('for_next_month') === 'on',
   });
   if (error) return { error: error.message };
   refresh();

@@ -11,6 +11,7 @@ import type { Account, Category, Extraction, Transaction, TxnType } from '@/lib/
 import { AccountOptions } from './account-options';
 import { AmountInput } from './amount-input';
 import { CategoryIcon } from './category-icon';
+import { NextMonthToggle } from './next-month-toggle';
 import { PawProgress } from './yuki';
 
 type Fields = {
@@ -69,6 +70,8 @@ export function TransactionEditor({
   const [deleting, startDelete] = useTransition();
   const amountRef = useRef<HTMLInputElement>(null);
   const started = useRef(false);
+  // Kept outside `fields` so it survives switching type away from income and back.
+  const [forNextMonth, setForNextMonth] = useState(tx?.for_next_month ?? false);
 
   const set = (key: keyof Fields, value: string) => {
     touched.current.add(key);
@@ -304,6 +307,8 @@ export function TransactionEditor({
             <input name="merchant" value={fields.merchant} onChange={(e) => set('merchant', e.target.value)} className="field" autoComplete="off" />
           </label>
         )}
+
+        {fields.type === 'income' && <NextMonthToggle checked={forNextMonth} onChange={setForNextMonth} />}
 
         {tx?.recurring_rule_id ? (
           <p className="flex items-center gap-2 text-sm text-ink-soft">
