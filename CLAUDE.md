@@ -28,7 +28,7 @@ Commit atomically, as a habit, without waiting to be asked:
 
 ## Architecture
 
-**Stack:** Next.js 16 App Router (`src/proxy.ts` is the v16 name for middleware) · Supabase Postgres/Auth/Storage via `@supabase/ssr` · Gemini Flash via `@google/genai` · Tailwind v4 · Vercel (hosting + cron). Functions are pinned to `sin1` in `vercel.json` to sit next to the Supabase project (`ap-southeast-1`); keep the two in the same region, since every page makes several sequential Supabase calls.
+**Stack:** Next.js 16 App Router (`src/middleware.ts` stays on the deprecated middleware name on purpose: it runs on the Edge runtime, while v16's `proxy.ts` is a separate Node function whose cold start added ~0.6 s to every PWA launch) · Supabase Postgres/Auth/Storage via `@supabase/ssr` · Gemini Flash via `@google/genai` · Tailwind v4 · Vercel (hosting + cron). Functions are pinned to `sin1` in `vercel.json` to sit next to the Supabase project (`ap-southeast-1`); keep the two in the same region, since every page makes several sequential Supabase calls.
 
 **Business logic lives in Postgres, not React** (PRD Part 2 §1a, to keep a future native iOS client cheap). `supabase/migrations/` holds the schema, RLS policies and SQL functions the app calls via `supabase.rpc`: `month_summary`, `upcoming_recurring`, `suggest_category`, `protective_nudges`, `set_default_account`, `finish_onboarding_step`, `start_salary`, `erase_my_data`, `run_due_recurring` (service role only), `next_occurrence`. New rules or thresholds go there, with a check in `supabase/tests/schema.test.mjs`. `src/lib/types.ts` hand-mirrors the row shapes; update it with any migration.
 

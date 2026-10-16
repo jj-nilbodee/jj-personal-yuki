@@ -6,7 +6,12 @@ const PUBLIC_PATHS = ['/login', '/auth/'];
 // Refreshes the Supabase session cookie on every request and keeps signed-out
 // visitors on /login. getClaims() verifies the JWT locally (no Auth round trip
 // unless the token needs refreshing). Data access is still enforced by RLS.
-export async function proxy(request: NextRequest) {
+//
+// This stays middleware.ts (Edge runtime) rather than Next 16's proxy.ts on
+// purpose: proxy runs as its own Node function, and booting it cold added
+// ~0.6 s in front of every first request after the app sat idle, which is
+// every launch of the installed PWA. Edge middleware starts in milliseconds.
+export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
