@@ -207,9 +207,10 @@ export async function saveRecurring(_prev: ActionResult, form: FormData): Promis
     anchor_day: anchorDay ?? Number(next.slice(8, 10)),
   };
   const id = str(form, 'id');
+  // A new rule may start earlier this month (onboarding) with that payment already made.
   const { error } = id
     ? await supabase.from('recurring_rules').update(row).eq('id', id)
-    : await supabase.from('recurring_rules').insert(row);
+    : await supabase.rpc('start_recurring', { p_rule: row, p_already_paid: form.get('already_paid') === 'on' });
   if (error) return { error: error.message };
   refresh();
   redirect(returnTo(form) ?? '/settings/recurring');

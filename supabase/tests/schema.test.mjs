@@ -191,6 +191,34 @@ await as(A, async () => {
     'start_salary for next month: payday already passed logs both paydays, each counted in the month after');
   sal = await startSalary(31, false, true);
   ok(sal.next === '2026-10-31' && sal.logged.length === 0, 'start_salary for next month: nothing logged unless paid');
+
+  // A bill from onboarding's bills step, with "today" pinned to 16 Oct 2026.
+  const startBill = async (first, paid, frequency = 'monthly', anchor = Number(first.slice(8))) => {
+    const rule = { type: 'expense', amount: 9000, account_id: bank, category_id: aFood, merchant: 'Rent', for_next_month: false, frequency, anchor_day: anchor, next_run_date: first, user_id: B };
+    const r = (await q(`select r.id, r.next_run_date::text as next, r.user_id from start_recurring($1, $2, '2026-10-16') r`, [rule, paid])).rows[0];
+    const logged = (await q(`select date::text d, type::text, amount::int, account_id, merchant, status::text from transactions where recurring_rule_id=$1 order by date`, [r.id])).rows;
+    return { ...r, logged };
+  };
+  let bill = await startBill('2026-10-01', true);
+  ok(bill.next === '2026-11-01' && bill.logged.length === 1 && bill.logged[0].d === '2026-10-01' && bill.logged[0].type === 'expense'
+    && bill.logged[0].amount === 9000 && bill.logged[0].account_id === bank && bill.logged[0].merchant === 'Rent' && bill.logged[0].status === 'confirmed',
+    'start_recurring: logs a bill already paid earlier this month and next runs next month');
+  ok(bill.user_id === A, 'start_recurring: the rule belongs to the caller, whatever p_rule says');
+  bill = await startBill('2026-10-01', false);
+  ok(bill.next === '2026-11-01' && bill.logged.length === 0, 'start_recurring: an unpaid past due date is skipped, not back-filled');
+  bill = await startBill('2026-10-16', true);
+  ok(bill.next === '2026-11-16' && bill.logged[0]?.d === '2026-10-16', 'start_recurring: paid today');
+  bill = await startBill('2026-10-16', false);
+  ok(bill.next === '2026-10-16' && bill.logged.length === 0, 'start_recurring: due today, not paid yet');
+  bill = await startBill('2026-10-25', true);
+  ok(bill.next === '2026-10-25' && bill.logged.length === 0, 'start_recurring: "already paid" ignored before the due date');
+  bill = await startBill('2026-10-01', true, 'weekly');
+  ok(bill.next === '2026-10-22' && bill.logged.map((l) => l.d).join() === '2026-10-01,2026-10-08,2026-10-15',
+    'start_recurring: weekly logs every due date through today');
+  ok(await fails(`select start_recurring($1, true, '2026-10-16')`, [{ type: 'expense', amount: 5, account_id: bank, for_next_month: false, frequency: 'monthly', anchor_day: 30, next_run_date: '2026-09-30' }]),
+    'start_recurring: refuses a first due date before this month');
+  await q(`delete from transactions where merchant = 'Rent'`);
+  await q(`delete from recurring_rules where merchant = 'Rent'`);
   ok(await fails(`insert into transactions (type, amount, account_id, for_next_month) values ('expense', 5, $1, true)`, [bank]), 'only income can count toward next month');
 
   // Monthly totals follow ledger_month: 31 Oct pay for November counts in November, not October.

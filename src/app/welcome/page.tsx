@@ -127,7 +127,7 @@ export default async function WelcomePage() {
           )}
           <div className="card p-4">
             {/* Remount after each save so the form is empty for the next one. */}
-            <RuleForm key={rules.length} categories={categories} accounts={accounts} returnTo="/welcome" />
+            <RuleForm key={rules.length} categories={categories} accounts={accounts} onboarding />
           </div>
           <SkipButton step="bills" label={rules.some((r) => r.type === 'expense') ? 'Done with bills' : 'Not now'} />
         </>
