@@ -24,7 +24,7 @@ Commit atomically, as a habit, without waiting to be asked:
 - One logical change per commit (a feature, a fix, a refactor, a docs or config change). If the work mixes concerns, split it into separate commits; a migration goes in the same commit as the code that needs it.
 - Commit as soon as a change is verified (build, lint, tests, and `npm run test:db` for migrations), so each commit stands on its own and unrelated work never piles up in the tree.
 - Conventional subjects as in the history (`feat:`, `fix:`, `chore:`, `test(db):`, `docs:`); the subject says what changed, the body says why.
-- Committing is not pushing: pushing `main` deploys to Vercel, and new migrations must reach Supabase (`supabase db push`) before the code that uses them.
+- Committing is not pushing: pushing `main` deploys to Vercel.
 
 ## Architecture
 
