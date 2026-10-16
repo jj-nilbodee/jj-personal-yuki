@@ -217,6 +217,20 @@ await as(A, async () => {
     'start_recurring: weekly logs every due date through today');
   ok(await fails(`select start_recurring($1, true, '2026-10-16')`, [{ type: 'expense', amount: 5, account_id: bank, for_next_month: false, frequency: 'monthly', anchor_day: 30, next_run_date: '2026-09-30' }]),
     'start_recurring: refuses a first due date before this month');
+
+  // The balance typed in at the account step already includes payments made before it.
+  const balanceOf = async (id) => Number((await q(`select balance from account_balances() where id=$1`, [id])).rows[0].balance);
+  let entered = await balanceOf(bank);
+  sal = await startSalary(5, true, true);
+  ok(sal.logged.length === 2 && (await balanceOf(bank)) === entered, 'start_salary: already-paid pay leaves the account balance as entered');
+  entered = await balanceOf(bank);
+  bill = await startBill('2026-10-01', true, 'weekly');
+  ok(bill.logged.length === 3 && (await balanceOf(bank)) === entered, 'start_recurring: already-paid bills leave the account balance as entered');
+  const [bankBefore, cashBefore] = [await balanceOf(bank), await balanceOf(cash)];
+  const saving = (await q(`select r.id from start_recurring($1, true, '2026-10-16') r`, [{ type: 'transfer', amount: 2000, account_id: bank, to_account_id: cash, merchant: 'Rent', for_next_month: false, frequency: 'monthly', anchor_day: 1, next_run_date: '2026-10-01' }])).rows[0];
+  ok((await q(`select count(*)::int n from transactions where recurring_rule_id=$1`, [saving.id])).rows[0].n === 1
+    && (await balanceOf(bank)) === bankBefore && (await balanceOf(cash)) === cashBefore,
+    'start_recurring: an already-paid transfer leaves both balances as entered');
   await q(`delete from transactions where merchant = 'Rent'`);
   await q(`delete from recurring_rules where merchant = 'Rent'`);
   ok(await fails(`insert into transactions (type, amount, account_id, for_next_month) values ('expense', 5, $1, true)`, [bank]), 'only income can count toward next month');
