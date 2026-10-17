@@ -2,14 +2,15 @@ import { redirect } from 'next/navigation';
 import { skipOnboardingStep } from '@/app/actions';
 import { AccountForm } from '@/components/account-form';
 import { ProfileForm } from '@/components/profile-form';
+import { SignedAmount } from '@/components/transaction-row';
 import { TransactionEditor } from '@/components/transaction-editor';
 import { YukiArt } from '@/components/yuki';
 import { transferLabel } from '@/lib/accounts';
-import { formatSigned } from '@/lib/format';
 import { getProfile } from '@/lib/profile';
 import { REPEAT_LABEL, repeatOf } from '@/lib/recurring';
 import { requireUser } from '@/lib/supabase/server';
 import { ONBOARDING_STEPS, type Account, type Category, type OnboardingStep, type RecurringRule } from '@/lib/types';
+import { RemoveBill } from './remove-bill';
 import { SalaryForm } from './salary-form';
 
 // First use (PRD part 3, section 7: the one place Yuki speaks in first person).
@@ -110,19 +111,22 @@ export default async function WelcomePage() {
         <>
           {rules.length > 0 && (
             <ul className="card divide-y divide-border">
-              {rules.map((r) => (
-                <li key={r.id} className="flex min-h-14 items-center gap-3 px-4 py-2">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">
-                      {r.type === 'transfer'
-                        ? transferLabel(r.account_id, r.to_account_id, accountById)
-                        : (r.merchant ?? categoryName.get(r.category_id ?? '') ?? 'Recurring')}
+              {rules.map((r) => {
+                const billName =
+                  r.type === 'transfer'
+                    ? transferLabel(r.account_id, r.to_account_id, accountById)
+                    : (r.merchant ?? categoryName.get(r.category_id ?? '') ?? 'Recurring');
+                return (
+                  <li key={r.id} className="flex min-h-14 items-center gap-3 py-2 pr-2 pl-4">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{billName}</span>
+                      <span className="block text-sm text-ink-soft">{REPEAT_LABEL[repeatOf(r)]}</span>
                     </span>
-                    <span className="block text-sm text-ink-soft">{REPEAT_LABEL[repeatOf(r)]}</span>
-                  </span>
-                  <span className="num">{formatSigned(r.amount, r.type)}</span>
-                </li>
-              ))}
+                    <SignedAmount amount={r.amount} type={r.type} />
+                    <RemoveBill id={r.id} name={billName} />
+                  </li>
+                );
+              })}
             </ul>
           )}
           <div className="card p-4">

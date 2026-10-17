@@ -232,7 +232,12 @@ await as(A, async () => {
   bill = await addRepeating('2026-10-01', 'monthly', null, { type: 'transfer', to_account_id: cash, category_id: null });
   ok(bill.logged.length === 1 && (await balanceOf(bank)) === bankBefore && (await balanceOf(cash)) === cashBefore,
     'start_recurring: during onboarding, a past transfer leaves both balances as entered');
+  await q(`select discard_onboarding_bill($1)`, [bill.id]);
+  ok((await q(`select ((select count(*) from recurring_rules where id=$1) + (select count(*) from transactions where recurring_rule_id=$1))::int n`, [bill.id])).rows[0].n === 0
+    && (await balanceOf(bank)) === bankBefore && (await balanceOf(cash)) === cashBefore,
+    'discard_onboarding_bill removes the bill and what it logged, leaving balances as entered');
   await q(`update profiles set onboarding_step = null`);
+  ok(await fails(`select discard_onboarding_bill($1)`, [sal.id]), 'discard_onboarding_bill only works during onboarding');
   await q(`delete from transactions where merchant = 'Rent'`);
   await q(`delete from recurring_rules where merchant = 'Rent'`);
   ok(await fails(`insert into transactions (type, amount, account_id, for_next_month) values ('expense', 5, $1, true)`, [bank]), 'only income can count toward next month');

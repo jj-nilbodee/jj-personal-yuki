@@ -263,6 +263,13 @@ async function continueOnboarding(form: FormData): Promise<void> {
   redirect('/welcome');
 }
 
+/** Onboarding's bills step: remove a bill added by mistake, with any entries it logged. */
+export async function discardOnboardingBill(id: string): Promise<void> {
+  const { supabase } = await requireUser();
+  await supabase.rpc('discard_onboarding_bill', { p_rule: id });
+  refresh();
+}
+
 export async function skipOnboardingStep(step: OnboardingStep): Promise<void> {
   const { supabase } = await requireUser();
   await supabase.rpc('finish_onboarding_step', { p_step: step });
