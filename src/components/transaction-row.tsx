@@ -31,6 +31,20 @@ const AMOUNT_STYLE: Record<TxnType, { Arrow: typeof ArrowUpRight; color: string 
   transfer: { Arrow: ArrowLeftRight, color: 'text-ink' },
 };
 
+/**
+ * An amount with its direction arrow. `muted` drops the colour (and keeps the arrow)
+ * for things that aren't real entries yet, like upcoming or scheduled ones.
+ */
+export function SignedAmount({ amount, type, muted = false }: { amount: number; type: TxnType | null; muted?: boolean }) {
+  const look = type ? AMOUNT_STYLE[type] : null;
+  return (
+    <span className={`num flex shrink-0 items-center gap-1 ${muted ? '' : `font-semibold ${look?.color ?? 'text-ink'}`}`}>
+      {look && <look.Arrow className="size-4" aria-label={type ?? undefined} />}
+      {formatSigned(amount, type)}
+    </span>
+  );
+}
+
 export function TransactionRow({
   tx,
   category,
@@ -46,9 +60,8 @@ export function TransactionRow({
   const title = isTransfer
     ? transferLabel(tx.account_id, tx.to_account_id, accounts)
     : (tx.merchant ?? category?.name ?? (tx.status === 'confirmed' ? 'Untitled' : 'Slip'));
-  const look = tx.type ? AMOUNT_STYLE[tx.type] : null;
   return (
-    <Link href={`/transactions/${tx.id}`} className="flex min-h-16 items-center gap-3 px-4 py-3">
+    <Link href={`/transactions/${tx.id}`} className="pressable flex min-h-16 items-center gap-3 px-4 py-3">
       <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-soft text-ink">
         {isTransfer ? <ArrowLeftRight className="size-5" aria-hidden /> : <CategoryIcon name={category?.icon} />}
       </span>
@@ -73,12 +86,7 @@ export function TransactionRow({
           )}
         </span>
       </span>
-      {tx.amount !== null && (
-        <span className={`num flex items-center gap-1 font-semibold ${look?.color ?? 'text-ink'}`}>
-          {look && <look.Arrow className="size-4" aria-label={tx.type ?? undefined} />}
-          {formatSigned(tx.amount, tx.type)}
-        </span>
-      )}
+      {tx.amount !== null && <SignedAmount amount={tx.amount} type={tx.type} />}
     </Link>
   );
 }
@@ -104,7 +112,7 @@ export function UpcomingRow({
         <span className="block truncate">{merchant ?? category?.name ?? 'Recurring'}</span>
         <span className="block text-sm">{dueLabel}</span>
       </span>
-      <span className="num">{formatSigned(amount, type)}</span>
+      <SignedAmount amount={amount} type={type} muted />
     </div>
   );
 }

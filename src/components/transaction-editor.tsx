@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
+import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Maximize2, Repeat as RepeatIcon, RotateCcw, Trash2, X } from 'lucide-react';
 import { deleteTransaction, saveTransaction } from '@/app/actions';
 import { endOfMonth, formatDay, formatMoney, todayISO } from '@/lib/format';
 import { REPEATS, type Repeat, repeatLabel } from '@/lib/recurring';
+import { useModal } from '@/lib/use-modal';
 import { THAI_BANKS } from '@/lib/slip/qr';
 import type { Account, Category, Extraction, Transaction, TxnType } from '@/lib/types';
 import { AccountOptions } from './account-options';
@@ -80,6 +81,10 @@ export function TransactionEditor({
   const [forNextMonth, setForNextMonth] = useState(tx?.for_next_month ?? false);
   const [repeat, setRepeat] = useState<Repeat | ''>(newRepeat ?? (onboarding ? 'monthly' : ''));
   const today = todayISO();
+  const formRef = useRef<HTMLFormElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const closePreview = useCallback(() => setPreviewOpen(false), []);
+  useModal(previewRef, previewOpen, closePreview);
 
   const set = (key: keyof Fields, value: string) => {
     touched.current.add(key);
@@ -130,6 +135,42 @@ export function TransactionEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Focus the amount for a quick new entry, but only with a real pointer: on a phone it
+  // would open the keyboard over the form before the user has seen it.
+  useEffect(() => {
+    if (!tx && !onboarding && window.matchMedia('(pointer: fine)').matches) amountRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // After a failed save, move focus to the control the error is about (or the error itself).
+  useEffect(() => {
+    if (!state?.error) return;
+    const form = formRef.current;
+    const control =
+      state.field === 'type' ? form?.querySelector('fieldset button') : state.field ? form?.elements.namedItem(state.field) : null;
+    (control instanceof HTMLElement ? control : document.getElementById('form-error'))?.focus();
+  }, [state]);
+
+  /** The save error, shown next to the control it is about. */
+  const errorFor = (field: string) =>
+    state?.error && state.field === field ? (
+      <p id={`${field}-error`} role="alert" className="text-sm font-semibold text-expense">
+        {state.error}
+      </p>
+    ) : null;
+  const invalid = (field: string) =>
+    state?.error && state.field === field ? { 'aria-invalid': true, 'aria-describedby': `${field}-error` } : {};
+
+  /** Arrow keys move through the category chips, like any radio group. */
+  function onCategoryKey(e: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+    const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = (index + step + visibleCategories.length) % visibleCategories.length;
+    set('category_id', visibleCategories[next].id);
+    (e.currentTarget.parentElement?.children[next] as HTMLElement | undefined)?.focus();
+  }
+
   function chooseType(type: TxnType) {
     if (type === fields.type) return;
     touched.current.add('type');
@@ -145,6 +186,15 @@ export function TransactionEditor({
   const visibleCategories = categories.filter((c) => c.type === fields.type && (!c.archived || c.id === fields.category_id));
   const isTransfer = fields.type === 'transfer';
   const qr = extraction?.qr;
+  // The chip that takes Tab focus: the chosen category, else the first.
+  const tabCategory = visibleCategories.some((c) => c.id === fields.category_id) ? fields.category_id : visibleCategories[0]?.id;
+  // Matches start_recurring(): for a new entry, the date entered decides whether this one is logged now.
+  const repeatHint =
+    !tx && repeat && fields.date
+      ? fields.date <= today
+        ? 'Already paid: this one is logged now, and the next ones log themselves when due.'
+        : `Nothing is logged yet. First one due: ${formatDay(repeat === 'month_end' ? endOfMonth(fields.date) : fields.date, today)}.`
+      : '';
 
   return (
     <div className="grid gap-5">
@@ -204,7 +254,7 @@ export function TransactionEditor({
         </p>
       )}
 
-      <form action={formAction} className="grid gap-5">
+      <form ref={formRef} action={formAction} className="grid gap-5">
         {tx && <input type="hidden" name="id" value={tx.id} />}
         {onboarding && <input type="hidden" name="return_to" value="/welcome" />}
         <input type="hidden" name="type" value={fields.type} />
@@ -234,6 +284,7 @@ export function TransactionEditor({
               </button>
             ))}
           </fieldset>
+          {errorFor('type')}
         </div>
 
         <label className="grid gap-1.5">
@@ -246,11 +297,11 @@ export function TransactionEditor({
               required
               value={fields.amount}
               onValueChange={(v) => set('amount', v)}
-              placeholder="0.00"
               className="field num h-16 pl-10 text-3xl"
-              autoFocus={!tx}
+              {...invalid('amount')}
             />
           </div>
+          {errorFor('amount')}
         </label>
 
         {(fields.type === 'expense' || fields.type === 'income') && (
@@ -259,7 +310,7 @@ export function TransactionEditor({
               Category
             </span>
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-labelledby="category-label">
-              {visibleCategories.map((c) => {
+              {visibleCategories.map((c, index) => {
                 const selected = fields.category_id === c.id;
                 return (
                   <button
@@ -267,8 +318,10 @@ export function TransactionEditor({
                     type="button"
                     role="radio"
                     aria-checked={selected}
+                    tabIndex={c.id === tabCategory ? 0 : -1}
                     onClick={() => set('category_id', selected ? '' : c.id)}
-                    className={`flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold ${
+                    onKeyDown={(e) => onCategoryKey(e, index)}
+                    className={`pressable flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold ${
                       selected ? 'border-accent bg-accent-soft' : 'border-border bg-surface text-ink-soft'
                     }`}
                   >
@@ -288,10 +341,18 @@ export function TransactionEditor({
           </label>
           <label className="grid gap-1.5">
             <span className="text-sm font-semibold">{isTransfer ? 'From account' : 'Account'}</span>
-            <select name="account_id" value={fields.account_id} onChange={(e) => set('account_id', e.target.value)} className="field" required>
+            <select
+              name="account_id"
+              value={fields.account_id}
+              onChange={(e) => set('account_id', e.target.value)}
+              className="field"
+              required
+              {...invalid('account_id')}
+            >
               <option value="">Choose</option>
               <AccountOptions accounts={accounts} selected={fields.account_id} />
             </select>
+            {errorFor('account_id')}
           </label>
           {isTransfer && (
             <label className="grid gap-1.5">
@@ -302,10 +363,12 @@ export function TransactionEditor({
                 onChange={(e) => set('to_account_id', e.target.value)}
                 className="field"
                 required
+                {...invalid('to_account_id')}
               >
                 <option value="">Choose</option>
                 <AccountOptions accounts={accounts} selected={fields.to_account_id} />
               </select>
+              {errorFor('to_account_id')}
             </label>
           )}
         </div>
@@ -334,7 +397,13 @@ export function TransactionEditor({
             <div className="grid gap-1.5">
               <label className="grid gap-1.5">
                 <span className="text-sm font-semibold">Repeat</span>
-                <select name="repeat" value={repeat} onChange={(e) => setRepeat(e.target.value as Repeat | '')} className="field">
+                <select
+                  name="repeat"
+                  value={repeat}
+                  onChange={(e) => setRepeat(e.target.value as Repeat | '')}
+                  className="field"
+                  aria-describedby={repeatHint ? 'repeat-hint' : undefined}
+                >
                   {!onboarding && <option value="">Doesn&apos;t repeat</option>}
                   {REPEATS.map((r) => (
                     <option key={r} value={r}>
@@ -343,14 +412,9 @@ export function TransactionEditor({
                   ))}
                 </select>
               </label>
-              {/* Matches start_recurring(): the date entered decides whether this one is logged now. */}
-              {!tx && repeat && fields.date && (
-                <p className="text-sm text-ink-soft">
-                  {fields.date <= today
-                    ? 'Already paid: this one is logged now, and the next ones log themselves when due.'
-                    : `Nothing is logged yet. It logs itself from ${formatDay(repeat === 'month_end' ? endOfMonth(fields.date) : fields.date, today)}.`}
-                </p>
-              )}
+              <p id="repeat-hint" aria-live="polite" className="text-sm text-ink-soft empty:hidden">
+                {repeatHint}
+              </p>
             </div>
           )
         )}
@@ -360,14 +424,14 @@ export function TransactionEditor({
           <textarea name="note" rows={2} value={fields.note} onChange={(e) => set('note', e.target.value)} className="field" />
         </label>
 
-        {state?.error && (
-          <p role="alert" className="text-sm font-semibold text-expense">
+        {state?.error && !state.field && (
+          <p id="form-error" role="alert" tabIndex={-1} className="text-sm font-semibold text-expense">
             {state.error}
           </p>
         )}
 
         <button className="btn btn-primary h-13 text-base" disabled={saving || fields.type === ''}>
-          {onboarding ? 'Add' : status === 'confirmed' ? 'Save' : 'Looks right, save'}
+          {saving ? 'Saving…' : onboarding ? 'Add' : status === 'confirmed' ? 'Save' : 'Looks right, save'}
         </button>
       </form>
 
@@ -392,9 +456,9 @@ export function TransactionEditor({
       )}
 
       {previewOpen && slipUrl && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/85 p-4" role="dialog" aria-modal aria-label="Slip">
-          <button className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4 grid size-11 place-items-center rounded-full bg-surface" onClick={() => setPreviewOpen(false)} aria-label="Close" autoFocus>
-            <X className="size-5" />
+        <div ref={previewRef} className="fixed inset-0 z-50 grid place-items-center overscroll-contain bg-black/85 p-4" role="dialog" aria-modal aria-label="Slip">
+          <button className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4 grid size-11 place-items-center rounded-full bg-surface" onClick={closePreview} aria-label="Close" autoFocus>
+            <X className="size-5" aria-hidden />
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL */}
           <img src={slipUrl} alt="Slip, full size" className="max-h-full max-w-full rounded-xl object-contain" />

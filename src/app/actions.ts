@@ -7,7 +7,8 @@ import { parseRepeat, scheduleFor } from '@/lib/recurring';
 import { requireUser } from '@/lib/supabase/server';
 import { ONBOARDING_STEPS, type AccountType, type CategoryType, type OnboardingStep, type Profile, type TxnType } from '@/lib/types';
 
-export type ActionResult = { error?: string } | undefined;
+/** `field` names the form control an error is about, so the form can show it there and focus it. */
+export type ActionResult = { error?: string; field?: string } | undefined;
 
 const str = (f: FormData, k: string) => {
   const v = f.get(k);
@@ -32,20 +33,21 @@ const TXN_TYPES: TxnType[] = ['expense', 'income', 'transfer'];
  */
 function typedFields(
   form: FormData,
-): { error: string } | { fields: Record<string, string | boolean | null> & { type: TxnType } } {
+): { error: string; field: string } | { fields: Record<string, string | boolean | null> & { type: TxnType } } {
   const type = str(form, 'type') as TxnType | null;
-  if (!type || !TXN_TYPES.includes(type)) return { error: 'Choose money out, money in, or a transfer.' };
+  if (!type || !TXN_TYPES.includes(type)) return { error: 'Choose money out, money in, or a transfer.', field: 'type' };
   const account_id = str(form, 'account_id');
   const for_next_month = type === 'income' && form.get('for_next_month') === 'on';
   if (type !== 'transfer') {
-    if (!account_id) return { error: 'Pick the account this money went through.' };
+    if (!account_id) return { error: 'Pick the account this money went through.', field: 'account_id' };
     return {
       fields: { type, account_id, to_account_id: null, category_id: str(form, 'category_id'), merchant: str(form, 'merchant'), for_next_month },
     };
   }
   const to_account_id = str(form, 'to_account_id');
-  if (!account_id || !to_account_id) return { error: 'Pick the account the money left and the one it went to.' };
-  if (account_id === to_account_id) return { error: 'Pick two different accounts.' };
+  if (!account_id) return { error: 'Pick the account the money left.', field: 'account_id' };
+  if (!to_account_id) return { error: 'Pick the account the money went to.', field: 'to_account_id' };
+  if (account_id === to_account_id) return { error: 'Pick two different accounts.', field: 'to_account_id' };
   return { fields: { type, account_id, to_account_id, category_id: null, merchant: null, for_next_month } };
 }
 
@@ -72,7 +74,7 @@ function returnTo(form: FormData): string | null {
 export async function saveTransaction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { supabase } = await requireUser();
   const amount = parseAmount(str(form, 'amount'));
-  if (!amount) return { error: 'Enter an amount above zero.' };
+  if (!amount) return { error: 'Enter an amount above zero.', field: 'amount' };
   const typed = typedFields(form);
   if ('error' in typed) return typed;
   const repeat = parseRepeat(str(form, 'repeat'));

@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, Camera, X } from 'lucide-react';
 import { prepareSlip } from '@/lib/slip/prepare';
 import { formatDay, formatMoney } from '@/lib/format';
+import { useModal } from '@/lib/use-modal';
 import { PawProgress } from './yuki';
 
 type State =
@@ -26,12 +27,8 @@ export function AddSheetProvider({ children }: { children: React.ReactNode }) {
   const open = useCallback(() => setState({ step: 'choose' }), []);
   const close = useCallback(() => setState({ step: 'closed' }), []);
 
-  useEffect(() => {
-    if (state.step === 'closed') return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [state.step, close]);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  useModal(sheetRef, state.step !== 'closed', close);
 
   async function onFile(file: File | undefined) {
     if (!file) return;
@@ -68,20 +65,26 @@ export function AddSheetProvider({ children }: { children: React.ReactNode }) {
         onChange={(e) => onFile(e.target.files?.[0])}
       />
       {state.step !== 'closed' && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center" role="dialog" aria-modal aria-label="Add a transaction">
-          <button className="absolute inset-0 bg-black/30" aria-label="Close" onClick={close} />
-          <div className="card safe-bottom relative w-full max-w-md rounded-b-none p-5 md:rounded-b-[1.25rem]">
+        <div
+          ref={sheetRef}
+          className="fixed inset-0 z-50 flex items-end justify-center overscroll-contain md:items-center"
+          role="dialog"
+          aria-modal
+          aria-label="Add a transaction"
+        >
+          <button className="absolute inset-0 bg-black/30" aria-label="Close" tabIndex={-1} onClick={close} />
+          <div className="card safe-bottom relative max-h-dvh w-full max-w-md overflow-y-auto overscroll-contain rounded-b-none p-5 md:rounded-b-[1.25rem]">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold">Add</h2>
               <button onClick={close} className="grid size-11 place-items-center rounded-full" aria-label="Close">
-                <X className="size-5" />
+                <X className="size-5" aria-hidden />
               </button>
             </div>
 
             {state.step === 'choose' && (
               <div className="grid gap-3">
                 <button className="btn btn-primary h-16 text-base" onClick={() => fileRef.current?.click()} autoFocus>
-                  <Camera className="size-5" /> Scan or upload a slip
+                  <Camera className="size-5" aria-hidden /> Scan or upload a slip
                 </button>
                 <div className="grid grid-cols-2 gap-3">
                   <Link href="/transactions/new" onClick={close} className="btn btn-quiet h-14">
@@ -100,36 +103,39 @@ export function AddSheetProvider({ children }: { children: React.ReactNode }) {
               </div>
             )}
 
-            {state.step === 'duplicate' && (
-              <div className="grid gap-4">
-                <p>
-                  This slip was already logged on {formatDay(state.existing.date)} for{' '}
-                  <span className="num font-semibold">{formatMoney(state.existing.amount)}</span>.
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <Link href={`/transactions/${state.existing.id}`} onClick={close} className="btn btn-primary">
-                    Open it
-                  </Link>
-                  <button className="btn btn-quiet" onClick={close}>
-                    Done
-                  </button>
+            {/* Announces the outcome of an upload; the paw progress is its own status. */}
+            <div aria-live="polite">
+              {state.step === 'duplicate' && (
+                <div className="grid gap-4">
+                  <p>
+                    This slip was already logged on {formatDay(state.existing.date)} for{' '}
+                    <span className="num font-semibold">{formatMoney(state.existing.amount)}</span>.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Link href={`/transactions/${state.existing.id}`} onClick={close} className="btn btn-primary">
+                      Open it
+                    </Link>
+                    <button className="btn btn-quiet" onClick={close}>
+                      Done
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {state.step === 'failed' && (
-              <div className="grid gap-4">
-                <p>Couldn&apos;t upload this one. Retry or enter it yourself.</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>
-                    Retry
-                  </button>
-                  <Link href="/transactions/new" onClick={close} className="btn btn-quiet">
-                    Enter manually
-                  </Link>
+              {state.step === 'failed' && (
+                <div className="grid gap-4">
+                  <p>Couldn&apos;t upload this one. Retry or enter it yourself.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>
+                      Retry
+                    </button>
+                    <Link href="/transactions/new" onClick={close} className="btn btn-quiet">
+                      Enter manually
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}

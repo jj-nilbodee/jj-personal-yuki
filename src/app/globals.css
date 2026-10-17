@@ -14,6 +14,9 @@
   --expense: #c4726a;
   --tile: #f6e9da; /* logo tile; illustrations only */
   --on-accent: #fffdf9;
+  /* Ink at 6% and 12%: hover and press tint over any background (pressable, btn). */
+  --hover: #5e524c0f;
+  --press: #5e524c1f;
   color-scheme: light;
 }
 
@@ -30,6 +33,8 @@
     --income: #9dc089;
     --expense: #e3978f;
     --on-accent: #241f1b;
+    --hover: #efe6dc0f;
+    --press: #efe6dc1f;
     color-scheme: dark;
   }
 }
@@ -46,6 +51,8 @@
   --income: #9dc089;
   --expense: #e3978f;
   --on-accent: #241f1b;
+  --hover: #efe6dc0f;
+  --press: #efe6dc1f;
   color-scheme: dark;
 }
 
@@ -84,6 +91,10 @@
     font: inherit;
     color: inherit;
   }
+  /* No double-tap-to-zoom delay on controls. */
+  a, button, input, select, textarea, label {
+    touch-action: manipulation;
+  }
 }
 
 @utility num {
@@ -106,9 +117,23 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 0.875rem;
+  /* The accent border marks focus from any input; keyboard focus also gets the base outline. */
   &:focus {
     border-color: var(--accent);
-    outline: none;
+  }
+}
+
+/* Hover and press feedback for tappable rows and chips: a tint of ink (--hover, --press)
+   over whatever the background is. Hover only where a real pointer can hover. */
+@utility pressable {
+  transition: box-shadow 150ms;
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      box-shadow: inset 0 0 0 100vmax var(--hover);
+    }
+  }
+  &:active:not(:disabled) {
+    box-shadow: inset 0 0 0 100vmax var(--press);
   }
 }
 
@@ -122,9 +147,18 @@
   border-radius: 999px;
   font-weight: 700;
   font-family: var(--font-display);
-  transition: opacity 150ms;
+  transition: opacity 150ms, box-shadow 150ms;
   &:disabled {
     opacity: 0.55;
+  }
+  /* Same feedback as `pressable`. */
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      box-shadow: inset 0 0 0 100vmax var(--hover);
+    }
+  }
+  &:active:not(:disabled) {
+    box-shadow: inset 0 0 0 100vmax var(--press);
   }
 }
 
