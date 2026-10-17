@@ -16,7 +16,7 @@ export default async function RecurringRulePage({ params }: { params: Promise<{ 
 
   return (
     <div className="grid gap-5">
-      <BackHeader href="/settings/recurring" title="Edit recurring" />
+      <BackHeader href="/transactions/recurring" title="Edit recurring" />
       <RuleForm rule={rule as RecurringRule} categories={(categories ?? []) as Category[]} accounts={(accounts ?? []) as Account[]} />
     </div>
   );

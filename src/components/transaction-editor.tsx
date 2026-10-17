@@ -324,7 +324,7 @@ export function TransactionEditor({
             <RepeatIcon className="size-4 shrink-0" aria-hidden />
             <span>
               Repeats automatically.{' '}
-              <Link href={`/settings/recurring/${tx.recurring_rule_id}`} className="font-semibold text-accent">
+              <Link href={`/transactions/recurring/${tx.recurring_rule_id}`} className="font-semibold text-accent">
                 Change the schedule
               </Link>
             </span>

@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
-import { BackHeader } from '@/components/back-header';
 import { YukiArt } from '@/components/yuki';
 import { transferLabel } from '@/lib/accounts';
 import { formatDay, formatSigned } from '@/lib/format';
 import { REPEAT_LABEL, repeatOf } from '@/lib/recurring';
 import { requireUser } from '@/lib/supabase/server';
 import type { Account, Category, RecurringRule } from '@/lib/types';
+import { TransactionsTabs } from '../tabs';
 import { RuleActions } from './rule-actions';
 
 export default async function RecurringPage() {
@@ -21,10 +21,10 @@ export default async function RecurringPage() {
   const list = (rules ?? []) as RecurringRule[];
 
   return (
-    <div className="grid gap-6">
-      <BackHeader href="/settings" title="Recurring" />
+    <div className="grid gap-5">
+      <TransactionsTabs current="recurring" />
       <p className="text-sm text-ink-soft">
-        Each one is added to your transactions automatically on its due date. Until then it shows as upcoming on the dashboard.
+        Each one is added to your entries automatically on its due date. Until then it shows as upcoming on the dashboard.
       </p>
       {list.length === 0 ? (
         <section className="card flex flex-col items-center gap-4 p-8 text-center">
@@ -39,7 +39,7 @@ export default async function RecurringPage() {
           <ul className="card divide-y divide-border">
             {list.map((r) => (
               <li key={r.id} className={`flex items-center gap-3 px-4 py-3 ${r.active ? '' : 'text-ink-soft'}`}>
-                <Link href={`/settings/recurring/${r.id}`} className="min-w-0 flex-1">
+                <Link href={`/transactions/recurring/${r.id}`} className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{r.type === 'transfer'
                       ? transferLabel(r.account_id, r.to_account_id, accounts)
                       : (r.merchant ?? categories.get(r.category_id ?? '')?.name ?? 'Recurring')}</span>

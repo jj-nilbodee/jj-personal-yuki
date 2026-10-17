@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ChevronRight, Repeat, Shapes, Wallet } from 'lucide-react';
+import { ChevronRight, Shapes, Wallet } from 'lucide-react';
 import { signOut } from '@/app/actions';
 import { ProfileForm } from '@/components/profile-form';
 import { YukiArt } from '@/components/yuki';
@@ -11,7 +11,6 @@ import { ThemePicker } from './theme-picker';
 const LINKS = [
   { href: '/settings/categories', label: 'Categories', icon: Shapes },
   { href: '/settings/accounts', label: 'Accounts', icon: Wallet },
-  { href: '/settings/recurring', label: 'Recurring', icon: Repeat },
 ];
 
 // Written by the owner (PRD part 3, section 7: Settings > About).

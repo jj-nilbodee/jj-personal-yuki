@@ -97,8 +97,8 @@ export async function saveTransaction(_prev: ActionResult, form: FormData): Prom
     });
     if (error) return { error: error.message };
     refresh();
-    // A date still to come logs nothing yet; the schedule is where it shows up.
-    redirect(returnTo(form) ?? (date > today ? '/settings/recurring' : '/transactions'));
+    // A date still to come logs nothing yet; the Recurring tab is where it shows up.
+    redirect(returnTo(form) ?? (date > today ? '/transactions/recurring' : '/transactions'));
   }
 
   const { data: saved, error } = id
@@ -228,7 +228,7 @@ export async function saveRecurring(_prev: ActionResult, form: FormData): Promis
   const { error } = await supabase.from('recurring_rules').update(row).eq('id', id);
   if (error) return { error: error.message };
   refresh();
-  redirect('/settings/recurring');
+  redirect('/transactions/recurring');
 }
 
 export async function setRecurringActive(id: string, active: boolean): Promise<void> {
@@ -241,7 +241,7 @@ export async function deleteRecurring(id: string): Promise<void> {
   const { supabase } = await requireUser();
   await supabase.from('recurring_rules').delete().eq('id', id);
   refresh();
-  redirect('/settings/recurring');
+  redirect('/transactions/recurring');
 }
 
 // ---------------------------------------------------------------------------

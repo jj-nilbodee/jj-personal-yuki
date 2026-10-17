@@ -102,7 +102,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const upcomingSection = upcoming.length > 0 && (
     <section>
-      <h2 className="mb-2 font-bold">Upcoming</h2>
+      <div className="mb-2 flex items-baseline justify-between">
+        <h2 className="font-bold">Upcoming</h2>
+        <Link href="/transactions/recurring" className="text-sm font-semibold text-accent">
+          See all
+        </Link>
+      </div>
       <div className="grid gap-2">
         {upcoming.slice(0, 5).map((u) => (
           <UpcomingRow

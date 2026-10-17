@@ -8,6 +8,7 @@ import { formatDay, formatMoney, formatMonth } from '@/lib/format';
 import { getProfile } from '@/lib/profile';
 import { requireUser } from '@/lib/supabase/server';
 import type { Account, Category, Transaction, TxnType } from '@/lib/types';
+import { TransactionsTabs } from './tabs';
 
 const PAGE_SIZE = 200;
 const TYPE_FILTERS: { type: TxnType; label: string }[] = [
@@ -74,7 +75,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
 
   return (
     <div className="grid gap-5">
-      <h1 className="font-display text-2xl font-extrabold">Transactions</h1>
+      <TransactionsTabs current="entries" />
 
       <form className="grid gap-2" role="search">
         <label className="relative block">
