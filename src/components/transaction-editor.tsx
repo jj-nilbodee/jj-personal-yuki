@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Maximize2, Repeat as RepeatIcon, RotateCcw, Trash2, X } from 'lucide-react';
 import { deleteTransaction, saveTransaction } from '@/app/actions';
-import { formatDay, formatMoney, todayISO } from '@/lib/format';
-import { REPEATS, repeatLabel } from '@/lib/recurring';
+import { endOfMonth, formatDay, formatMoney, todayISO } from '@/lib/format';
+import { REPEATS, type Repeat, repeatLabel } from '@/lib/recurring';
 import { THAI_BANKS } from '@/lib/slip/qr';
 import type { Account, Category, Extraction, Transaction, TxnType } from '@/lib/types';
 import { AccountOptions } from './account-options';
@@ -48,6 +48,8 @@ const TYPES = [
 export function TransactionEditor({
   tx,
   newType,
+  newRepeat,
+  onboarding = false,
   categories,
   accounts,
   slipUrl,
@@ -55,6 +57,10 @@ export function TransactionEditor({
   tx?: Transaction;
   /** Starting type for a new entry; defaults to expense. */
   newType?: TxnType;
+  /** Starting Repeat schedule for a new entry; defaults to none. */
+  newRepeat?: Repeat;
+  /** Onboarding's bills step: always repeats, and saving stays on /welcome. */
+  onboarding?: boolean;
   categories: Category[];
   accounts: Account[];
   slipUrl?: string | null;
@@ -72,6 +78,8 @@ export function TransactionEditor({
   const started = useRef(false);
   // Kept outside `fields` so it survives switching type away from income and back.
   const [forNextMonth, setForNextMonth] = useState(tx?.for_next_month ?? false);
+  const [repeat, setRepeat] = useState<Repeat | ''>(newRepeat ?? (onboarding ? 'monthly' : ''));
+  const today = todayISO();
 
   const set = (key: keyof Fields, value: string) => {
     touched.current.add(key);
@@ -198,6 +206,7 @@ export function TransactionEditor({
 
       <form action={formAction} className="grid gap-5">
         {tx && <input type="hidden" name="id" value={tx.id} />}
+        {onboarding && <input type="hidden" name="return_to" value="/welcome" />}
         <input type="hidden" name="type" value={fields.type} />
         <input type="hidden" name="category_id" value={fields.category_id} />
 
@@ -322,17 +331,27 @@ export function TransactionEditor({
           </p>
         ) : (
           fields.type !== '' && (
-            <label className="grid gap-1.5">
-              <span className="text-sm font-semibold">Repeat</span>
-              <select name="repeat" defaultValue="" className="field">
-                <option value="">Doesn&apos;t repeat</option>
-                {REPEATS.map((r) => (
-                  <option key={r} value={r}>
-                    {repeatLabel(r, fields.date)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="grid gap-1.5">
+              <label className="grid gap-1.5">
+                <span className="text-sm font-semibold">Repeat</span>
+                <select name="repeat" value={repeat} onChange={(e) => setRepeat(e.target.value as Repeat | '')} className="field">
+                  {!onboarding && <option value="">Doesn&apos;t repeat</option>}
+                  {REPEATS.map((r) => (
+                    <option key={r} value={r}>
+                      {repeatLabel(r, fields.date)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {/* Matches start_recurring(): the date entered decides whether this one is logged now. */}
+              {!tx && repeat && fields.date && (
+                <p className="text-sm text-ink-soft">
+                  {fields.date <= today
+                    ? 'Already paid: this one is logged now, and the next ones log themselves when due.'
+                    : `Nothing is logged yet. It logs itself from ${formatDay(repeat === 'month_end' ? endOfMonth(fields.date) : fields.date, today)}.`}
+                </p>
+              )}
+            </div>
           )
         )}
 
@@ -348,7 +367,7 @@ export function TransactionEditor({
         )}
 
         <button className="btn btn-primary h-13 text-base" disabled={saving || fields.type === ''}>
-          {status === 'confirmed' ? 'Save' : 'Looks right, save'}
+          {onboarding ? 'Add' : status === 'confirmed' ? 'Save' : 'Looks right, save'}
         </button>
       </form>
 

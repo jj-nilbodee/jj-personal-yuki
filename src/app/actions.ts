@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { endOfMonth } from '@/lib/format';
+import { endOfMonth, todayISO } from '@/lib/format';
 import { parseRepeat, scheduleFor } from '@/lib/recurring';
 import { requireUser } from '@/lib/supabase/server';
 import { ONBOARDING_STEPS, type AccountType, type CategoryType, type OnboardingStep, type Profile, type TxnType } from '@/lib/types';
@@ -65,7 +65,9 @@ function returnTo(form: FormData): string | null {
 
 /**
  * Create (no id) or update a transaction. Saving always confirms it. With a
- * `repeat` schedule the entry also becomes a recurring rule (make_recurring).
+ * `repeat` schedule the entry also becomes a recurring rule. A new one goes
+ * through start_recurring, which logs it only if its date has come; an
+ * existing entry is already logged and is turned into a rule (make_recurring).
  */
 export async function saveTransaction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { supabase } = await requireUser();
@@ -74,6 +76,7 @@ export async function saveTransaction(_prev: ActionResult, form: FormData): Prom
   const typed = typedFields(form);
   if ('error' in typed) return typed;
   const repeat = parseRepeat(str(form, 'repeat'));
+  const schedule = repeat && scheduleFor(repeat);
 
   const row = {
     ...typed.fields,
@@ -84,6 +87,20 @@ export async function saveTransaction(_prev: ActionResult, form: FormData): Prom
   };
 
   const id = str(form, 'id');
+  if (!id && schedule) {
+    const today = todayISO();
+    const date = row.date ?? today;
+    const { error } = await supabase.rpc('start_recurring', {
+      p_entry: { ...row, date },
+      p_frequency: schedule.frequency,
+      p_anchor_day: schedule.anchorDay,
+    });
+    if (error) return { error: error.message };
+    refresh();
+    // A date still to come logs nothing yet; the schedule is where it shows up.
+    redirect(returnTo(form) ?? (date > today ? '/settings/recurring' : '/transactions'));
+  }
+
   const { data: saved, error } = id
     ? await supabase.from('transactions').update(row).eq('id', id).select('id').single()
     : await supabase.from('transactions').insert({ ...row, source: 'manual' }).select('id').single();
@@ -91,16 +108,15 @@ export async function saveTransaction(_prev: ActionResult, form: FormData): Prom
   if (error) {
     return { error: error.code === '23505' ? 'That bank reference is already on another entry.' : error.message };
   }
-  if (repeat) {
-    const { frequency, anchorDay } = scheduleFor(repeat);
+  if (schedule) {
     const { error: repeatError } = await supabase.rpc('make_recurring', {
       p_transaction_id: saved.id,
-      p_frequency: frequency,
-      p_anchor_day: anchorDay,
+      p_frequency: schedule.frequency,
+      p_anchor_day: schedule.anchorDay,
     });
     if (repeatError) {
       refresh();
-      return { error: `Saved, but it isn't repeating yet (${repeatError.message}). Set it up in Settings › Recurring.` };
+      return { error: `Saved, but it isn't repeating yet (${repeatError.message}). Pick the Repeat schedule again and save.` };
     }
   }
   refresh();
@@ -186,8 +202,11 @@ export async function setDefaultAccount(id: string): Promise<void> {
 // Recurring rules
 // ---------------------------------------------------------------------------
 
+/** Edit a recurring rule. New ones are added through the entry form's Repeat (saveTransaction). */
 export async function saveRecurring(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { supabase } = await requireUser();
+  const id = str(form, 'id');
+  if (!id) return { error: 'Add new repeating entries from the Add button.' };
   const amount = parseAmount(str(form, 'amount'));
   const picked = str(form, 'next_run_date');
   if (!amount) return { error: 'Enter an amount above zero.' };
@@ -206,14 +225,10 @@ export async function saveRecurring(_prev: ActionResult, form: FormData): Promis
     next_run_date: next,
     anchor_day: anchorDay ?? Number(next.slice(8, 10)),
   };
-  const id = str(form, 'id');
-  // A new rule may start earlier this month (onboarding) with that payment already made.
-  const { error } = id
-    ? await supabase.from('recurring_rules').update(row).eq('id', id)
-    : await supabase.rpc('start_recurring', { p_rule: row, p_already_paid: form.get('already_paid') === 'on' });
+  const { error } = await supabase.from('recurring_rules').update(row).eq('id', id);
   if (error) return { error: error.message };
   refresh();
-  redirect(returnTo(form) ?? '/settings/recurring');
+  redirect('/settings/recurring');
 }
 
 export async function setRecurringActive(id: string, active: boolean): Promise<void> {

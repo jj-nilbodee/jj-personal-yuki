@@ -30,7 +30,7 @@ export default async function RecurringPage() {
         <section className="card flex flex-col items-center gap-4 p-8 text-center">
           <YukiArt pose="asleep" size={104} />
           <p>Rent, subscriptions and salary can log themselves.</p>
-          <Link href="/settings/recurring/new" className="btn btn-primary">
+          <Link href="/transactions/new?repeat=monthly" className="btn btn-primary">
             <Plus className="size-5" aria-hidden /> Add a recurring transaction
           </Link>
         </section>
@@ -52,7 +52,7 @@ export default async function RecurringPage() {
               </li>
             ))}
           </ul>
-          <Link href="/settings/recurring/new" className="btn btn-quiet justify-self-start">
+          <Link href="/transactions/new?repeat=monthly" className="btn btn-quiet justify-self-start">
             <Plus className="size-5" aria-hidden /> Add a recurring transaction
           </Link>
         </>

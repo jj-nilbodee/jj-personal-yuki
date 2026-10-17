@@ -192,45 +192,47 @@ await as(A, async () => {
   sal = await startSalary(31, false, true);
   ok(sal.next === '2026-10-31' && sal.logged.length === 0, 'start_salary for next month: nothing logged unless paid');
 
-  // A bill from onboarding's bills step, with "today" pinned to 16 Oct 2026.
-  const startBill = async (first, paid, frequency = 'monthly', anchor = Number(first.slice(8))) => {
-    const rule = { type: 'expense', amount: 9000, account_id: bank, category_id: aFood, merchant: 'Rent', for_next_month: false, frequency, anchor_day: anchor, next_run_date: first, user_id: B };
-    const r = (await q(`select r.id, r.next_run_date::text as next, r.user_id from start_recurring($1, $2, '2026-10-16') r`, [rule, paid])).rows[0];
+  // Adding a repeating entry, with "today" pinned to 16 Oct 2026: the date entered
+  // decides whether it is a payment already made (logged now) or one still to come.
+  const addRepeating = async (date, frequency = 'monthly', anchor = null, extra = {}) => {
+    const entry = { type: 'expense', amount: 9000, account_id: bank, category_id: aFood, merchant: 'Rent', for_next_month: false, date, user_id: B, ...extra };
+    const r = (await q(`select r.id, r.next_run_date::text as next, r.anchor_day, r.user_id from start_recurring($1, $2, $3, '2026-10-16') r`, [entry, frequency, anchor])).rows[0];
     const logged = (await q(`select date::text d, type::text, amount::int, account_id, merchant, status::text from transactions where recurring_rule_id=$1 order by date`, [r.id])).rows;
     return { ...r, logged };
   };
-  let bill = await startBill('2026-10-01', true);
+  let bill = await addRepeating('2026-10-01');
   ok(bill.next === '2026-11-01' && bill.logged.length === 1 && bill.logged[0].d === '2026-10-01' && bill.logged[0].type === 'expense'
     && bill.logged[0].amount === 9000 && bill.logged[0].account_id === bank && bill.logged[0].merchant === 'Rent' && bill.logged[0].status === 'confirmed',
-    'start_recurring: logs a bill already paid earlier this month and next runs next month');
-  ok(bill.user_id === A, 'start_recurring: the rule belongs to the caller, whatever p_rule says');
-  bill = await startBill('2026-10-01', false);
-  ok(bill.next === '2026-11-01' && bill.logged.length === 0, 'start_recurring: an unpaid past due date is skipped, not back-filled');
-  bill = await startBill('2026-10-16', true);
-  ok(bill.next === '2026-11-16' && bill.logged[0]?.d === '2026-10-16', 'start_recurring: paid today');
-  bill = await startBill('2026-10-16', false);
-  ok(bill.next === '2026-10-16' && bill.logged.length === 0, 'start_recurring: due today, not paid yet');
-  bill = await startBill('2026-10-25', true);
-  ok(bill.next === '2026-10-25' && bill.logged.length === 0, 'start_recurring: "already paid" ignored before the due date');
-  bill = await startBill('2026-10-01', true, 'weekly');
-  ok(bill.next === '2026-10-22' && bill.logged.map((l) => l.d).join() === '2026-10-01,2026-10-08,2026-10-15',
-    'start_recurring: weekly logs every due date through today');
-  ok(await fails(`select start_recurring($1, true, '2026-10-16')`, [{ type: 'expense', amount: 5, account_id: bank, for_next_month: false, frequency: 'monthly', anchor_day: 30, next_run_date: '2026-09-30' }]),
-    'start_recurring: refuses a first due date before this month');
+    'start_recurring: a date already past is logged as paid and repeats from the next due date');
+  ok(bill.user_id === A, 'start_recurring: the rule belongs to the caller, whatever p_entry says');
+  bill = await addRepeating('2026-10-16');
+  ok(bill.next === '2026-11-16' && bill.logged.map((l) => l.d).join() === '2026-10-16', 'start_recurring: dated today is logged as paid');
+  bill = await addRepeating('2026-10-25');
+  ok(bill.next === '2026-10-25' && bill.anchor_day === 25 && bill.logged.length === 0, 'start_recurring: a date still to come logs nothing and first runs on that date');
+  bill = await addRepeating('2026-10-25', 'monthly', 31);
+  ok(bill.next === '2026-10-31' && bill.logged.length === 0, 'start_recurring: month-end still to come first runs on the last day');
+  bill = await addRepeating('2026-10-01', 'weekly');
+  ok(bill.next === '2026-10-22' && bill.logged.map((l) => l.d).join() === '2026-10-01', 'start_recurring: weekly logs the entry entered, not the weeks since');
+  bill = await addRepeating('2026-09-01');
+  ok(bill.next === '2026-11-01' && bill.logged.map((l) => l.d).join() === '2026-09-01', 'start_recurring: due dates between an old payment and today are skipped, not back-filled');
 
-  // The balance typed in at the account step already includes payments made before it.
+  // Balances typed in during onboarding already include payments made before them.
   const balanceOf = async (id) => Number((await q(`select balance from account_balances() where id=$1`, [id])).rows[0].balance);
   let entered = await balanceOf(bank);
+  await addRepeating('2026-10-01');
+  ok((await balanceOf(bank)) === entered - 9000, 'start_recurring: after onboarding, a payment logged now moves the balance');
+  await q(`update profiles set onboarding_step = 'bills'`);
+  entered = await balanceOf(bank);
   sal = await startSalary(5, true, true);
   ok(sal.logged.length === 2 && (await balanceOf(bank)) === entered, 'start_salary: already-paid pay leaves the account balance as entered');
   entered = await balanceOf(bank);
-  bill = await startBill('2026-10-01', true, 'weekly');
-  ok(bill.logged.length === 3 && (await balanceOf(bank)) === entered, 'start_recurring: already-paid bills leave the account balance as entered');
+  bill = await addRepeating('2026-10-01');
+  ok(bill.logged.length === 1 && (await balanceOf(bank)) === entered, 'start_recurring: during onboarding, a past payment leaves the balance as entered');
   const [bankBefore, cashBefore] = [await balanceOf(bank), await balanceOf(cash)];
-  const saving = (await q(`select r.id from start_recurring($1, true, '2026-10-16') r`, [{ type: 'transfer', amount: 2000, account_id: bank, to_account_id: cash, merchant: 'Rent', for_next_month: false, frequency: 'monthly', anchor_day: 1, next_run_date: '2026-10-01' }])).rows[0];
-  ok((await q(`select count(*)::int n from transactions where recurring_rule_id=$1`, [saving.id])).rows[0].n === 1
-    && (await balanceOf(bank)) === bankBefore && (await balanceOf(cash)) === cashBefore,
-    'start_recurring: an already-paid transfer leaves both balances as entered');
+  bill = await addRepeating('2026-10-01', 'monthly', null, { type: 'transfer', to_account_id: cash, category_id: null });
+  ok(bill.logged.length === 1 && (await balanceOf(bank)) === bankBefore && (await balanceOf(cash)) === cashBefore,
+    'start_recurring: during onboarding, a past transfer leaves both balances as entered');
+  await q(`update profiles set onboarding_step = null`);
   await q(`delete from transactions where merchant = 'Rent'`);
   await q(`delete from recurring_rules where merchant = 'Rent'`);
   ok(await fails(`insert into transactions (type, amount, account_id, for_next_month) values ('expense', 5, $1, true)`, [bank]), 'only income can count toward next month');

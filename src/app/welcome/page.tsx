@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { skipOnboardingStep } from '@/app/actions';
 import { AccountForm } from '@/components/account-form';
 import { ProfileForm } from '@/components/profile-form';
-import { RuleForm } from '@/components/rule-form';
+import { TransactionEditor } from '@/components/transaction-editor';
 import { YukiArt } from '@/components/yuki';
 import { transferLabel } from '@/lib/accounts';
 import { formatSigned } from '@/lib/format';
@@ -127,7 +127,7 @@ export default async function WelcomePage() {
           )}
           <div className="card p-4">
             {/* Remount after each save so the form is empty for the next one. */}
-            <RuleForm key={rules.length} categories={categories} accounts={accounts} onboarding />
+            <TransactionEditor key={rules.length} categories={categories} accounts={accounts} onboarding />
           </div>
           <SkipButton step="bills" label={rules.some((r) => r.type === 'expense') ? 'Done with bills' : 'Not now'} />
         </>
