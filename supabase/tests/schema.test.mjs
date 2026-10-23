@@ -27,7 +27,8 @@ await q(`insert into auth.users values ($1,'a@x'),($2,'b@x')`, [A, B]);
 const as = async (uid, fn) => { await db.exec(`set role authenticated; set test.uid = '${uid}'`); try { return await fn(); } finally { await db.exec(`reset role; set test.uid = ''`); } };
 const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
 
-ok((await q(`select count(*)::int n from categories where user_id=$1`, [A])).rows[0].n === 25, 'default categories seeded');
+const defaultCount = (await q(`select count(*)::int n from default_categories()`)).rows[0].n;
+ok((await q(`select count(*)::int n from categories where user_id=$1`, [A])).rows[0].n === defaultCount, 'default categories seeded');
 const bCat = (await q(`select id from categories where user_id=$1 limit 1`, [B])).rows[0].id;
 const aFood = (await q(`select id from categories where user_id=$1 and name='Food & Dining'`, [A])).rows[0].id;
 const aSalary = (await q(`select id from categories where user_id=$1 and name='Salary'`, [A])).rows[0].id;
@@ -60,7 +61,7 @@ await as(B, async () => {
 });
 
 await as(A, async () => {
-  ok((await q(`select count(*)::int n from categories`)).rows[0].n === 25, 'RLS: A sees only own categories');
+  ok((await q(`select count(*)::int n from categories`)).rows[0].n === defaultCount, 'RLS: A sees only own categories');
   let err = null; try { await q(`insert into transactions (amount, account_id, category_id) values (10, $1, $2)`, [cashId, bCat]); } catch (e) { err = e.message; }
   ok(err && /foreign key/.test(err), 'cannot reference another user\'s category');
   err = null; try { await q(`insert into transactions (user_id, amount) values ($1, 10)`, [B]); } catch (e) { err = e.message; }
@@ -312,7 +313,7 @@ await as(A, async () => {
 });
 const aAfter = await counts(A);
 ok(aAfter.tx === 0 && aAfter.rules === 0 && aAfter.accounts === 0, 'erase_my_data removes entries, rules and accounts');
-ok(aAfter.categories === 25 && aAfter.step === 'name' && aAfter.budget === null, 'erase_my_data restores default categories and restarts onboarding');
+ok(aAfter.categories === defaultCount && aAfter.step === 'name' && aAfter.budget === null, 'erase_my_data restores default categories and restarts onboarding');
 ok(JSON.stringify(await counts(B)) === JSON.stringify(bBefore), 'erase_my_data leaves other users alone');
 let eraseErr = null; try { await q(`select erase_my_data()`); } catch (e) { eraseErr = e.message; }
 ok(eraseErr && /not signed in/.test(eraseErr), 'erase_my_data needs a signed-in caller');

@@ -1,5 +1,5 @@
 import {
-  Briefcase, Bus, Car, Circle, Clapperboard, Download, Gift, GraduationCap, HandCoins, HeartPulse, House, HousePlus, Landmark,
+  Briefcase, Bus, Car, Circle, Clapperboard, Coffee, Download, Gift, GraduationCap, HandCoins, HeartPulse, House, HousePlus, Landmark,
   Laptop, PawPrint, Plane, Plug, Receipt, Repeat, Scissors, Send, ShieldCheck, Shirt, ShoppingBag, ShoppingBasket, Smartphone,
   Users, Utensils, type LucideIcon,
 } from 'lucide-react';
@@ -7,6 +7,7 @@ import {
 // The icon set offered when creating a category. Stored by name in categories.icon.
 export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   utensils: Utensils,
+  coffee: Coffee,
   'shopping-basket': ShoppingBasket,
   bus: Bus,
   car: Car,
