@@ -41,7 +41,7 @@ export default async function RecurringPage() {
             {list.map((r) => {
               const name = r.type === 'transfer'
                 ? transferLabel(r.account_id, r.to_account_id, accounts)
-                : (r.merchant ?? categories.get(r.category_id ?? '')?.name ?? 'Recurring');
+                : (r.note ?? categories.get(r.category_id ?? '')?.name ?? 'Recurring');
               return (
                 <li key={r.id} className={`flex items-center gap-3 pr-2 ${r.active ? '' : 'text-ink-soft'}`}>
                   <Link href={`/transactions/recurring/${r.id}`} className="pressable flex min-h-16 min-w-0 flex-1 items-center gap-3 py-3 pl-4">

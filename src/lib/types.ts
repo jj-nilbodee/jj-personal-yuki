@@ -60,7 +60,6 @@ export interface Transaction {
   type: TxnType | null; // null on a slip draft until the user picks a direction
   amount: number | null;
   date: string; // YYYY-MM-DD, Bangkok local date
-  merchant: string | null;
   note: string | null;
   /** Income that pays for the following month; monthly totals count it there. */
   for_next_month: boolean;
@@ -82,7 +81,6 @@ export interface RecurringRule {
   account_id: string | null;
   to_account_id: string | null;
   category_id: string | null;
-  merchant: string | null;
   note: string | null;
   for_next_month: boolean;
   frequency: Frequency;
@@ -96,7 +94,6 @@ export interface UpcomingRecurring {
   due_date: string;
   type: TxnType;
   amount: number;
-  merchant: string | null;
   note: string | null;
   category_id: string | null;
   account_id: string | null;
@@ -137,7 +134,7 @@ export interface Extraction {
 }
 
 export interface Suggestion {
-  merchant?: string | null;
+  note?: string | null;
   category_id?: string | null;
   account_id?: string | null;
 }

@@ -37,7 +37,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   if (q) {
     const amount = Number(q.replace(/[฿,\s]/g, ''));
     query = query.or(
-      [`merchant.ilike.%${q}%`, `note.ilike.%${q}%`, Number.isFinite(amount) && amount > 0 && `amount.eq.${amount}`]
+      [`note.ilike.%${q}%`, Number.isFinite(amount) && amount > 0 && `amount.eq.${amount}`]
         .filter(Boolean)
         .join(','),
     );
@@ -81,7 +81,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
         <label className="relative block">
           <span className="sr-only">Search</span>
           <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-soft" aria-hidden />
-          <input name="q" defaultValue={f.q} placeholder="Payee, note or amount" className="field pl-10" type="search" />
+          <input name="q" defaultValue={f.q} placeholder="Note or amount" className="field pl-10" type="search" />
         </label>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
           <select name="type" defaultValue={type ?? ''} className="field" aria-label="Type">

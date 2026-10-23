@@ -11,7 +11,6 @@ type Row = Pick<
   | 'id'
   | 'type'
   | 'amount'
-  | 'merchant'
   | 'note'
   | 'status'
   | 'date'
@@ -59,7 +58,7 @@ export function TransactionRow({
   const isTransfer = tx.type === 'transfer';
   const title = isTransfer
     ? transferLabel(tx.account_id, tx.to_account_id, accounts)
-    : (tx.merchant ?? category?.name ?? (tx.status === 'confirmed' ? 'Untitled' : 'Slip'));
+    : (tx.note ?? category?.name ?? (tx.status === 'confirmed' ? 'Untitled' : 'Slip'));
   return (
     <Link href={`/transactions/${tx.id}`} className="pressable flex min-h-16 items-center gap-3 px-4 py-3">
       <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-soft text-ink">
@@ -92,13 +91,13 @@ export function TransactionRow({
 }
 
 export function UpcomingRow({
-  merchant,
+  title,
   amount,
   type,
   dueLabel,
   category,
 }: {
-  merchant: string | null;
+  title: string | null;
   amount: number;
   type: TxnType;
   dueLabel: string;
@@ -109,7 +108,7 @@ export function UpcomingRow({
     <div className="flex min-h-14 min-w-0 items-center gap-3 rounded-2xl border border-dashed border-border px-4 py-2.5 text-ink-soft">
       <CalendarClock className="size-5 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="block truncate">{merchant ?? category?.name ?? 'Recurring'}</span>
+        <span className="block truncate">{title ?? category?.name ?? 'Recurring'}</span>
         <span className="block text-sm">{dueLabel}</span>
       </span>
       <SignedAmount amount={amount} type={type} muted />

@@ -32,12 +32,6 @@ export function RuleForm({ rule, categories, accounts }: { rule: RecurringRule; 
           <AmountInput name="amount" required defaultValue={rule.amount} className="field num" />
         </label>
       </div>
-      {type !== 'transfer' && (
-        <label className="grid gap-1.5">
-          <span className="text-sm font-semibold">{type === 'income' ? 'From' : 'Paid to'}</span>
-          <input name="merchant" defaultValue={rule.merchant ?? ''} className="field" placeholder="e.g. Rent, Netflix" />
-        </label>
-      )}
       {type === 'income' && <NextMonthToggle defaultChecked={rule.for_next_month} />}
       <div className="grid grid-cols-2 gap-3">
         <label className="grid gap-1.5">
@@ -89,7 +83,7 @@ export function RuleForm({ rule, categories, accounts }: { rule: RecurringRule; 
       </div>
       <label className="grid gap-1.5">
         <span className="text-sm font-semibold">Note</span>
-        <input name="note" defaultValue={rule.note ?? ''} className="field" />
+        <input name="note" defaultValue={rule.note ?? ''} className="field" placeholder="e.g. Rent, Netflix" />
       </label>
       {state?.error && <p className="text-sm font-semibold text-expense" role="alert">{state.error}</p>}
       <div className="flex items-center gap-3">

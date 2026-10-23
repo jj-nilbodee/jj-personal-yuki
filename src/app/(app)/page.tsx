@@ -112,7 +112,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         {upcoming.slice(0, 5).map((u) => (
           <UpcomingRow
             key={`${u.rule_id}-${u.due_date}`}
-            merchant={u.type === 'transfer' ? transferLabel(u.account_id, u.to_account_id, accounts) : u.merchant}
+            title={u.type === 'transfer' ? transferLabel(u.account_id, u.to_account_id, accounts) : u.note}
             amount={u.amount}
             type={u.type}
             dueLabel={dueLabel(u.due_date)}
@@ -124,7 +124,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   );
 
   return (
-    // grid-cols-1 (minmax(0, 1fr)): long payee or bill names truncate instead of widening the page.
+    // grid-cols-1 (minmax(0, 1fr)): long notes or bill names truncate instead of widening the page.
     <div className="grid grid-cols-1 gap-6">
       <header className="flex items-center justify-between">
         <Link href={`/?month=${shiftMonth(month, -1)}`} className="grid size-11 place-items-center rounded-full" aria-label="Previous month">

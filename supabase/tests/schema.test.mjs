@@ -69,8 +69,8 @@ await as(A, async () => {
   err = null; try { await q(`insert into transactions (amount, status) values (null, 'confirmed')`); } catch (e) { err = e.message; }
   ok(err && /check/.test(err), 'confirmed requires amount');
   await q(`insert into transactions (amount, status, source) values (null, 'processing', 'qr')`);
-  await q(`insert into transactions (amount, merchant, category_id, account_id, date, bank_ref) values (120.50, 'Cafe Amazon', $1, $2, '2026-09-10', 'REF1')`, [aFood, cashId]);
-  await q(`insert into transactions (amount, merchant, account_id, date) values (99.25, 'Mystery', $1, '2026-09-11')`, [cashId]);
+  await q(`insert into transactions (amount, note, category_id, account_id, date, bank_ref) values (120.50, 'Cafe Amazon', $1, $2, '2026-09-10', 'REF1')`, [aFood, cashId]);
+  await q(`insert into transactions (amount, note, account_id, date) values (99.25, 'Mystery', $1, '2026-09-11')`, [cashId]);
   await q(`insert into transactions (type, amount, category_id, account_id, date) values ('income', 50000, $1, $2, '2026-09-01')`, [aSalary, cashId]);
   err = null; try { await q(`insert into transactions (amount, account_id, bank_ref) values (5, $1, 'REF1')`, [cashId]); } catch (e) { err = e.message; }
   ok(err && /duplicate key/.test(err), 'duplicate bank_ref rejected');
@@ -78,10 +78,10 @@ await as(A, async () => {
   console.log('  summary', JSON.stringify(s));
   ok(Number(s.expense) === 219.75 && Number(s.income) === 50000 && s.categories[0].name === 'Food & Dining', 'month_summary totals & ordering (excludes processing)');
   ok(s.categories.every((c) => c.name !== 'Salary') && s.income_categories.length === 1 && s.income_categories[0].name === 'Salary' && Number(s.income_categories[0].total) === 50000, 'month_summary splits income categories from spending');
-  ok((await q(`select suggest_category(' cafe amazon ') c`)).rows[0].c === aFood, 'suggest_category by merchant history');
+  ok((await q(`select suggest_category(' cafe amazon ') c`)).rows[0].c === aFood, 'suggest_category by note history');
   let e2 = null; try { await q(`select run_due_recurring()`); } catch (e) { e2 = e.message; }
   ok(e2 && /permission denied/.test(e2), 'authenticated cannot run cron function');
-  await q(`insert into recurring_rules (amount, merchant, account_id, anchor_day, next_run_date) values (15000, 'Rent', $1, 31, '2026-08-31')`, [cashId]);
+  await q(`insert into recurring_rules (amount, note, account_id, anchor_day, next_run_date) values (15000, 'Rent', $1, 31, '2026-08-31')`, [cashId]);
 });
 await as(B, async () => {
   ok((await q(`select count(*)::int n from transactions`)).rows[0].n === 0, 'RLS: B sees none of A\'s transactions');
@@ -196,14 +196,14 @@ await as(A, async () => {
   // Adding a repeating entry, with "today" pinned to 16 Oct 2026: the date entered
   // decides whether it is a payment already made (logged now) or one still to come.
   const addRepeating = async (date, frequency = 'monthly', anchor = null, extra = {}) => {
-    const entry = { type: 'expense', amount: 9000, account_id: bank, category_id: aFood, merchant: 'Rent', for_next_month: false, date, user_id: B, ...extra };
+    const entry = { type: 'expense', amount: 9000, account_id: bank, category_id: aFood, note: 'Rent', for_next_month: false, date, user_id: B, ...extra };
     const r = (await q(`select r.id, r.next_run_date::text as next, r.anchor_day, r.user_id from start_recurring($1, $2, $3, '2026-10-16') r`, [entry, frequency, anchor])).rows[0];
-    const logged = (await q(`select date::text d, type::text, amount::int, account_id, merchant, status::text from transactions where recurring_rule_id=$1 order by date`, [r.id])).rows;
+    const logged = (await q(`select date::text d, type::text, amount::int, account_id, note, status::text from transactions where recurring_rule_id=$1 order by date`, [r.id])).rows;
     return { ...r, logged };
   };
   let bill = await addRepeating('2026-10-01');
   ok(bill.next === '2026-11-01' && bill.logged.length === 1 && bill.logged[0].d === '2026-10-01' && bill.logged[0].type === 'expense'
-    && bill.logged[0].amount === 9000 && bill.logged[0].account_id === bank && bill.logged[0].merchant === 'Rent' && bill.logged[0].status === 'confirmed',
+    && bill.logged[0].amount === 9000 && bill.logged[0].account_id === bank && bill.logged[0].note === 'Rent' && bill.logged[0].status === 'confirmed',
     'start_recurring: a date already past is logged as paid and repeats from the next due date');
   ok(bill.user_id === A, 'start_recurring: the rule belongs to the caller, whatever p_entry says');
   bill = await addRepeating('2026-10-16');
@@ -239,8 +239,8 @@ await as(A, async () => {
     'discard_onboarding_bill removes the bill and what it logged, leaving balances as entered');
   await q(`update profiles set onboarding_step = null`);
   ok(await fails(`select discard_onboarding_bill($1)`, [sal.id]), 'discard_onboarding_bill only works during onboarding');
-  await q(`delete from transactions where merchant = 'Rent'`);
-  await q(`delete from recurring_rules where merchant = 'Rent'`);
+  await q(`delete from transactions where note = 'Rent'`);
+  await q(`delete from recurring_rules where note = 'Rent'`);
   ok(await fails(`insert into transactions (type, amount, account_id, for_next_month) values ('expense', 5, $1, true)`, [bank]), 'only income can count toward next month');
 
   // Monthly totals follow ledger_month: 31 Oct pay for November counts in November, not October.
@@ -267,9 +267,9 @@ await as(A, async () => {
   ok(up.length === 1 && up[0].to_account_id === cash, 'upcoming_recurring includes transfers with destination');
 
   // An entry set to repeat becomes a rule; the entry is the first occurrence.
-  const salary = (await q(`insert into transactions (type, amount, category_id, merchant, account_id, date) values ('income', 42000, $1, 'Acme', $2, '2026-09-15') returning id`, [aSalary, bank])).rows[0].id;
+  const salary = (await q(`insert into transactions (type, amount, category_id, note, account_id, date) values ('income', 42000, $1, 'Acme', $2, '2026-09-15') returning id`, [aSalary, bank])).rows[0].id;
   const rule = (await q(`select r.*, r.next_run_date::text as next from make_recurring($1, 'monthly', 31, '2026-09-20') r`, [salary])).rows[0];
-  ok(rule.type === 'income' && Number(rule.amount) === 42000 && rule.category_id === aSalary && rule.merchant === 'Acme' && rule.account_id === bank, 'make_recurring copies the entry');
+  ok(rule.type === 'income' && Number(rule.amount) === 42000 && rule.category_id === aSalary && rule.note === 'Acme' && rule.account_id === bank, 'make_recurring copies the entry');
   ok(rule.anchor_day === 31 && rule.next === '2026-09-30', 'make_recurring: month-end salary first runs at the end of the entry\'s month');
   ok((await q(`select recurring_rule_id from transactions where id=$1`, [salary])).rows[0].recurring_rule_id === rule.id, 'make_recurring links the entry to its rule');
   ok(await fails(`select make_recurring($1, 'monthly')`, [salary]), 'an entry can only be made recurring once');
@@ -279,7 +279,7 @@ await as(A, async () => {
   const draft = (await q(`insert into transactions (type, amount, status, source) values ('expense', 7, 'needs_review', 'ocr') returning id`)).rows[0].id;
   ok(await fails(`select make_recurring($1, 'monthly')`, [draft]), 'a draft cannot be made recurring');
 });
-const salaryTx = (await q(`select id from transactions where merchant = 'Acme'`)).rows[0].id;
+const salaryTx = (await q(`select id from transactions where note = 'Acme'`)).rows[0].id;
 await as(B, async () => {
   let err = null; try { await q(`select make_recurring($1, 'monthly')`, [salaryTx]); } catch (e) { err = e.message; }
   ok(err && /not found/.test(err), 'make_recurring cannot reach another user\'s entry');

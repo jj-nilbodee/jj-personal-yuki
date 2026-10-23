@@ -19,7 +19,6 @@ type Fields = {
   type: TxnType | ''; // '' on a slip draft until the user says which way the money went
   amount: string;
   date: string;
-  merchant: string;
   category_id: string;
   account_id: string;
   to_account_id: string;
@@ -32,7 +31,6 @@ function fieldsFrom(tx: Partial<Transaction> | undefined, defaultAccount: string
     type: tx ? (tx.type ?? '') : newType,
     amount: tx?.amount != null ? String(tx.amount) : '',
     date: tx?.date ?? todayISO(),
-    merchant: tx?.merchant ?? '',
     category_id: tx?.category_id ?? '',
     account_id: tx?.account_id ?? defaultAccount,
     to_account_id: tx?.to_account_id ?? '',
@@ -96,7 +94,7 @@ export function TransactionEditor({
     const suggestion = f.type ? ex?.suggested?.[f.type] : undefined;
     if (!suggestion) return f;
     const next = { ...f };
-    for (const k of ['merchant', 'category_id', 'account_id'] as const) {
+    for (const k of ['note', 'category_id', 'account_id'] as const) {
       if (!touched.current.has(k)) next[k] = suggestion[k] ?? (k === 'account_id' ? defaultAccount : '');
     }
     return next;
@@ -372,13 +370,6 @@ export function TransactionEditor({
             </label>
           )}
         </div>
-
-        {!isTransfer && (
-          <label className="grid gap-1.5">
-            <span className="text-sm font-semibold">{fields.type === 'income' ? 'From' : 'Paid to'}</span>
-            <input name="merchant" value={fields.merchant} onChange={(e) => set('merchant', e.target.value)} className="field" autoComplete="off" />
-          </label>
-        )}
 
         {fields.type === 'income' && <NextMonthToggle checked={forNextMonth} onChange={setForNextMonth} />}
 

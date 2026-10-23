@@ -115,7 +115,7 @@ export default async function WelcomePage() {
                 const billName =
                   r.type === 'transfer'
                     ? transferLabel(r.account_id, r.to_account_id, accountById)
-                    : (r.merchant ?? categoryName.get(r.category_id ?? '') ?? 'Recurring');
+                    : (r.note ?? categoryName.get(r.category_id ?? '') ?? 'Recurring');
                 return (
                   <li key={r.id} className="flex min-h-14 items-center gap-3 py-2 pr-2 pl-4">
                     <span className="min-w-0 flex-1">

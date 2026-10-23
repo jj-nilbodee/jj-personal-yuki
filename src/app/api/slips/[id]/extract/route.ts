@@ -6,7 +6,7 @@ import type { Category, CategoryType, Extraction, SlipFields, Suggestion, Transa
 const MIN_CONFIDENCE = 0.5;
 
 // Step 2 of the slip flow: read the stored photo with Gemini and fill in what
-// the QR code doesn't carry (amount, date, merchant). Safe to call again to retry.
+// the QR code doesn't carry (amount, date, who was paid). Safe to call again to retry.
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -52,18 +52,18 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   // money left that account (an expense, or the "from" side of a transfer).
   const sendingAccount = bankAccounts?.length === 1 ? bankAccounts[0].id : null;
   const suggestCategory = async (type: CategoryType, party: string | null, modelPick: string | null) => {
-    // Prefer the category this payee/payer got last time; fall back to the model's pick.
-    const fromHistory = party ? (await supabase.rpc('suggest_category', { p_merchant: party, p_type: type })).data : null;
+    // Prefer the category an entry with this note got last time; fall back to the model's pick.
+    const fromHistory = party ? (await supabase.rpc('suggest_category', { p_note: party, p_type: type })).data : null;
     return fromHistory ?? categories?.find((c) => c.type === type && c.name === modelPick)?.id ?? null;
   };
   const suggested: NonNullable<Extraction['suggested']> = {
     expense: {
-      merchant: ocr?.merchant ?? null,
+      note: ocr?.merchant ?? null,
       category_id: ocr ? await suggestCategory('expense', ocr.merchant, ocr.expense_category) : null,
       account_id: sendingAccount,
     },
     income: {
-      merchant: ocr?.sender_name ?? null,
+      note: ocr?.sender_name ?? null,
       category_id: ocr ? await suggestCategory('income', ocr.sender_name, ocr.income_category) : null,
       account_id: null,
     },
@@ -74,7 +74,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   // Drafts from before slips asked for a direction already have a type; fill those in place.
   const forType: Suggestion | undefined = tx.type ? suggested[tx.type] : undefined;
   if (forType) {
-    update.merchant = tx.merchant ?? forType.merchant ?? null;
+    update.note = tx.note ?? forType.note ?? null;
     update.category_id = tx.category_id ?? forType.category_id ?? null;
     update.account_id = tx.account_id ?? forType.account_id ?? null;
   }

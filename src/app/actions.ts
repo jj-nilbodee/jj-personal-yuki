@@ -28,7 +28,7 @@ const TXN_TYPES: TxnType[] = ['expense', 'income', 'transfer'];
 
 /**
  * Type plus the fields that depend on it. A transfer moves money between two of
- * the user's own accounts, so it has a destination and never a category or payee.
+ * the user's own accounts, so it has a destination and never a category.
  * Only income can count toward the following month.
  */
 function typedFields(
@@ -41,14 +41,14 @@ function typedFields(
   if (type !== 'transfer') {
     if (!account_id) return { error: 'Pick the account this money went through.', field: 'account_id' };
     return {
-      fields: { type, account_id, to_account_id: null, category_id: str(form, 'category_id'), merchant: str(form, 'merchant'), for_next_month },
+      fields: { type, account_id, to_account_id: null, category_id: str(form, 'category_id'), for_next_month },
     };
   }
   const to_account_id = str(form, 'to_account_id');
   if (!account_id) return { error: 'Pick the account the money left.', field: 'account_id' };
   if (!to_account_id) return { error: 'Pick the account the money went to.', field: 'to_account_id' };
   if (account_id === to_account_id) return { error: 'Pick two different accounts.', field: 'to_account_id' };
-  return { fields: { type, account_id, to_account_id, category_id: null, merchant: null, for_next_month } };
+  return { fields: { type, account_id, to_account_id, category_id: null, for_next_month } };
 }
 
 function refresh() {
